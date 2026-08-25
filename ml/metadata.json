@@ -1,0 +1,152 @@
+{
+  "best_model_name": "Gradient Boosting",
+  "features": [
+    "rainfall_1h",
+    "rainfall_3h",
+    "rainfall_6h",
+    "rainfall_12h",
+    "rainfall_24h",
+    "rainfall_3d",
+    "rainfall_7d",
+    "max_rainfall_intensity",
+    "antecedent_rainfall_index",
+    "temperature",
+    "humidity",
+    "wind_speed",
+    "elevation",
+    "slope",
+    "aspect",
+    "plan_curvature",
+    "profile_curvature",
+    "soil_moisture",
+    "vegetation_density",
+    "soil_type_code",
+    "land_cover_code",
+    "geology_strength",
+    "previous_landslides"
+  ],
+  "thresholds": {
+    "low_max": 0.2,
+    "moderate_max": 0.5,
+    "high_max": 0.75,
+    "very_high_min": 0.75
+  },
+  "metrics": {
+    "accuracy": 0.8792,
+    "precision": 0.8616,
+    "recall": 0.7606,
+    "f1_score": 0.8079,
+    "roc_auc": 0.9336,
+    "confusion_matrix": [
+      [
+        750,
+        49
+      ],
+      [
+        96,
+        305
+      ]
+    ],
+    "composite_score": 0.8338
+  },
+  "all_model_results": {
+    "Random Forest (Baseline)": {
+      "accuracy": 0.8825,
+      "precision": 0.8757,
+      "recall": 0.7556,
+      "f1_score": 0.8112,
+      "roc_auc": 0.9327,
+      "confusion_matrix": [
+        [
+          756,
+          43
+        ],
+        [
+          98,
+          303
+        ]
+      ],
+      "composite_score": 0.8326
+    },
+    "Gradient Boosting": {
+      "accuracy": 0.8792,
+      "precision": 0.8616,
+      "recall": 0.7606,
+      "f1_score": 0.8079,
+      "roc_auc": 0.9336,
+      "confusion_matrix": [
+        [
+          750,
+          49
+        ],
+        [
+          96,
+          305
+        ]
+      ],
+      "composite_score": 0.8338
+    },
+    "Extra Trees": {
+      "accuracy": 0.8775,
+      "precision": 0.8649,
+      "recall": 0.7506,
+      "f1_score": 0.8037,
+      "roc_auc": 0.9337,
+      "confusion_matrix": [
+        [
+          752,
+          47
+        ],
+        [
+          100,
+          301
+        ]
+      ],
+      "composite_score": 0.8289
+    },
+    "Neural Network (MLP)": {
+      "accuracy": 0.8608,
+      "precision": 0.8162,
+      "recall": 0.7531,
+      "f1_score": 0.7834,
+      "roc_auc": 0.8949,
+      "confusion_matrix": [
+        [
+          731,
+          68
+        ],
+        [
+          99,
+          302
+        ]
+      ],
+      "composite_score": 0.8125
+    }
+  },
+  "feature_importances": {
+    "antecedent_rainfall_index": 0.3112,
+    "rainfall_3d": 0.206,
+    "slope": 0.1274,
+    "soil_moisture": 0.0489,
+    "rainfall_7d": 0.0419,
+    "vegetation_density": 0.0378,
+    "geology_strength": 0.0325,
+    "rainfall_24h": 0.0298,
+    "humidity": 0.0155,
+    "elevation": 0.0139,
+    "wind_speed": 0.0133,
+    "rainfall_12h": 0.0132,
+    "max_rainfall_intensity": 0.013,
+    "profile_curvature": 0.0129,
+    "rainfall_3h": 0.0118,
+    "rainfall_6h": 0.0116,
+    "rainfall_1h": 0.0116,
+    "plan_curvature": 0.0111,
+    "temperature": 0.0111,
+    "aspect": 0.0103,
+    "previous_landslides": 0.0079,
+    "land_cover_code": 0.0047,
+    "soil_type_code": 0.0026
+  },
+  "sample_count": 6000
+}
