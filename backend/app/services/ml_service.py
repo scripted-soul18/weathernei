@@ -11,6 +11,7 @@ from datetime import datetime
 # Add ml directory to sys.path
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "..", "..", "ml")))
 
+# pyrefly: ignore [missing-import]
 from predict import get_predictor
 from services.weather_service import weather_service
 from services.terrain_service import terrain_service

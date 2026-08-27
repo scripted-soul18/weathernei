@@ -9,6 +9,7 @@ import { WeatherCharts } from './components/WeatherCharts';
 import { ModelMetricsModal } from './components/ModelMetricsModal';
 import { SavedLocationsDrawer } from './components/SavedLocationsDrawer';
 import { InteractiveMap } from './map/InteractiveMap';
+import { ThemeProvider } from './context/ThemeContext';
 import {
   WeatherForecastResponse,
   LandslidePredictionResponse,
@@ -30,7 +31,7 @@ const DEFAULT_LAT = 31.1048;
 const DEFAULT_LON = 77.1734;
 const DEFAULT_NAME = 'Shimla, Himachal Pradesh, India';
 
-export function App() {
+function DashboardContent() {
   const [lat, setLat] = useState<number>(DEFAULT_LAT);
   const [lon, setLon] = useState<number>(DEFAULT_LON);
   const [locationName, setLocationName] = useState<string>(DEFAULT_NAME);
@@ -107,7 +108,7 @@ export function App() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col selection:bg-cyan-500 selection:text-white">
+    <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 flex flex-col selection:bg-cyan-500 selection:text-white transition-colors duration-300">
       {/* Top Sticky Navigation */}
       <Navbar
         onSelectCoordinates={handleSelectCoordinates}
@@ -168,7 +169,7 @@ export function App() {
             {weatherData ? (
               <WeatherCard weather={weatherData.current} isLoading={isLoading} />
             ) : (
-              <div className="glass-panel p-6 rounded-2xl h-48 flex items-center justify-center text-slate-400">
+              <div className="glass-panel bg-white/80 dark:bg-slate-900/80 p-6 rounded-2xl h-48 flex items-center justify-center text-slate-500 dark:text-slate-400">
                 Loading meteorological conditions...
               </div>
             )}
@@ -181,7 +182,7 @@ export function App() {
                 isLoading={isLoading}
               />
             ) : (
-              <div className="glass-panel p-6 rounded-2xl h-64 flex items-center justify-center text-slate-400">
+              <div className="glass-panel bg-white/80 dark:bg-slate-900/80 p-6 rounded-2xl h-64 flex items-center justify-center text-slate-500 dark:text-slate-400">
                 Evaluating landslide hazard probability...
               </div>
             )}
@@ -200,11 +201,11 @@ export function App() {
       </main>
 
       {/* Footer */}
-      <footer className="w-full border-t border-slate-800/80 glass-panel py-6 text-center text-xs text-slate-500 space-y-1">
-        <p>
+      <footer className="w-full border-t border-slate-200 dark:border-slate-800/80 glass-panel bg-white/80 dark:bg-slate-950/80 py-6 text-center text-xs text-slate-500 dark:text-slate-400 space-y-1 transition-colors duration-300">
+        <p className="font-semibold text-slate-700 dark:text-slate-300">
           TERRA-GUARD &copy; {new Date().getFullYear()} Weather Forecast & Landslide Risk Prediction Platform.
         </p>
-        <p className="text-[11px] text-slate-400 max-w-xl mx-auto px-4">
+        <p className="text-[11px] text-slate-500 dark:text-slate-400 max-w-xl mx-auto px-4">
           All predictions are AI-based risk estimates calculated from multi-factor geotechnical and meteorological models.
           Always follow official warnings from local disaster management authorities.
         </p>
@@ -228,4 +229,13 @@ export function App() {
   );
 }
 
+export function App() {
+  return (
+    <ThemeProvider>
+      <DashboardContent />
+    </ThemeProvider>
+  );
+}
+
 export default App;
+
