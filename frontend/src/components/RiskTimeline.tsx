@@ -60,16 +60,16 @@ export const RiskTimeline: React.FC<RiskTimelineProps> = ({ timeline, isLoading 
           </div>
           <div>
             <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm tracking-wide">
-              Prediction Timeline Forecast (+72 Hours)
+              72-Hour Hazard Timeline Horizon
             </h3>
             <p className="text-[11px] text-slate-500 dark:text-slate-400">
-              Future cumulative rainfall infiltration & soil saturation risk progression
+              Future cumulative rainfall & soil saturation progression
             </p>
           </div>
         </div>
 
         {/* Selected Horizon Summary Pill */}
-        <div className="flex items-center gap-2 self-start sm:self-auto bg-slate-100 dark:bg-slate-900/90 px-3 py-1 rounded-xl border border-slate-200 dark:border-slate-800 text-xs">
+        <div className="flex items-center gap-2 self-start sm:self-auto bg-slate-100 dark:bg-slate-800/90 px-3 py-1 rounded-xl border border-slate-200 dark:border-slate-700/80 text-xs shadow-sm">
           <span className="text-slate-500 dark:text-slate-400">Forecast at <strong className="text-cyan-700 dark:text-cyan-300">{selectedItem.time_offset}</strong>:</span>
           <span className={`font-bold flex items-center gap-1.5 ${selectedBadge.color}`}>
             <span className={`w-2 h-2 rounded-full ${selectedBadge.dot}`} />
@@ -92,7 +92,7 @@ export const RiskTimeline: React.FC<RiskTimelineProps> = ({ timeline, isLoading 
               className={`p-3 rounded-xl border text-left transition-all duration-200 flex flex-col justify-between ${
                 isSelected
                   ? 'bg-cyan-500/10 dark:bg-slate-800/90 border-cyan-500/80 shadow-md ring-1 ring-cyan-500/50'
-                  : 'bg-slate-50 dark:bg-slate-900/50 hover:bg-slate-100 dark:hover:bg-slate-900/90 border-slate-200 dark:border-slate-800/80'
+                  : 'bg-slate-50 dark:bg-slate-900/50 hover:bg-slate-100 dark:hover:bg-slate-800/80 border-slate-200 dark:border-slate-800/80'
               }`}
             >
               <div className="flex items-center justify-between mb-2">
@@ -129,7 +129,7 @@ export const RiskTimeline: React.FC<RiskTimelineProps> = ({ timeline, isLoading 
               <th className="px-4 py-2.5">Temperature</th>
               <th className="px-4 py-2.5">Humidity</th>
               <th className="px-4 py-2.5">Soil Saturation</th>
-              <th className="px-4 py-2.5 text-right">Landslide Risk Level</th>
+              <th className="px-4 py-2.5 text-right">Hazard Risk Level</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-200 dark:divide-slate-800/60 font-mono">

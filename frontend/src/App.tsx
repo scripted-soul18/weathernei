@@ -6,7 +6,6 @@ import { LandslideRiskCard } from './components/LandslideRiskCard';
 import { AlertBanner } from './components/AlertBanner';
 import { RiskTimeline } from './components/RiskTimeline';
 import { WeatherCharts } from './components/WeatherCharts';
-import { ModelMetricsModal } from './components/ModelMetricsModal';
 import { SavedLocationsDrawer } from './components/SavedLocationsDrawer';
 import { InteractiveMap } from './map/InteractiveMap';
 import { ThemeProvider } from './context/ThemeContext';
@@ -26,7 +25,7 @@ import {
   fetchAlerts
 } from './services/api';
 
-// Initial default location: Shimla (Himalayan mountainous terrain, famous landslide monitoring site)
+// Initial default location: Shimla (Mountainous terrain)
 const DEFAULT_LAT = 31.1048;
 const DEFAULT_LON = 77.1734;
 const DEFAULT_NAME = 'Shimla, Himachal Pradesh, India';
@@ -43,7 +42,6 @@ function DashboardContent() {
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
 
   const [isLoading, setIsLoading] = useState<boolean>(true);
-  const [isMetricsOpen, setIsMetricsOpen] = useState<boolean>(false);
   const [isSavedOpen, setIsSavedOpen] = useState<boolean>(false);
   const [isAlertDismissed, setIsAlertDismissed] = useState<boolean>(false);
 
@@ -59,7 +57,7 @@ function DashboardContent() {
       setIsAlertDismissed(false);
 
       try {
-        // Parallel fetch of weather, ML prediction, spatial risk map, timeline, and reverse geocoding
+        // Parallel fetch of weather, landslide prediction, spatial risk map, timeline, and reverse geocoding
         const [wData, pData, rData, tData, locInfo, activeAlerts] = await Promise.all([
           fetchWeather(targetLat, targetLon).catch(() => null),
           predictLandslide({
@@ -80,7 +78,7 @@ function DashboardContent() {
         if (locInfo?.display_name) setLocationName(locInfo.display_name);
         setAlerts(activeAlerts);
       } catch (err) {
-        console.error('Failed to load platform data:', err);
+        console.error('Failed to load weather analysis data:', err);
       } finally {
         setIsLoading(false);
       }
@@ -108,22 +106,21 @@ function DashboardContent() {
   };
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-900 dark:bg-slate-950 dark:text-slate-100 flex flex-col selection:bg-cyan-500 selection:text-white transition-colors duration-300">
-      {/* Top Sticky Navigation */}
+    <div className="min-h-screen bg-transparent text-slate-100 flex flex-col selection:bg-blue-600 selection:text-white transition-colors duration-300">
+      {/* Top In-App Navigation Bar */}
       <Navbar
         onSelectCoordinates={handleSelectCoordinates}
         currentLat={lat}
         currentLon={lon}
         onOpenSavedLocations={() => setIsSavedOpen(true)}
-        onOpenModelMetrics={() => setIsMetricsOpen(true)}
         onRefresh={handleRefresh}
         isLoading={isLoading}
         alertCount={alerts.length}
         currentRiskLevel={predictionData?.risk_level}
       />
 
-      {/* Main Dashboard Body */}
-      <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 space-y-6">
+      {/* Main Analysis Viewport */}
+      <main className="flex-1 max-w-7xl w-full mx-auto px-3 sm:px-6 py-4 sm:py-6 space-y-5">
         {/* Safety Alert Banner (if Risk is HIGH or VERY HIGH and not dismissed) */}
         {predictionData && !isAlertDismissed && (
           <AlertBanner
@@ -136,7 +133,7 @@ function DashboardContent() {
           />
         )}
 
-        {/* Top Location & Elevation Stats Bar */}
+        {/* Location & Terrain Overview Bar */}
         <TopStatsBar
           locationName={locationName}
           latitude={lat}
@@ -148,10 +145,10 @@ function DashboardContent() {
           lastUpdated={predictionData?.timestamp || new Date().toISOString()}
         />
 
-        {/* Main 2-Column Responsive Layout */}
-        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* Left Column: Interactive Leaflet Map with Spatial Heat Overlay (7 Cols) */}
-          <div className="lg:col-span-7 h-[540px] sm:h-[600px] flex flex-col">
+        {/* 2-Column Responsive Layout: Interactive Map + Weather & Risk Cards */}
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 sm:gap-6 items-start">
+          {/* Left Column: Interactive Map (7 Cols) */}
+          <div className="lg:col-span-7 h-[460px] sm:h-[560px] flex flex-col">
             <InteractiveMap
               latitude={lat}
               longitude={lon}
@@ -163,9 +160,9 @@ function DashboardContent() {
             />
           </div>
 
-          {/* Right Column: Current Weather Card + Landslide Risk Assessment (5 Cols) */}
-          <div className="lg:col-span-5 space-y-6">
-            {/* Current Weather Card */}
+          {/* Right Column: Live Weather + Landslide Risk Assessment (5 Cols) */}
+          <div className="lg:col-span-5 space-y-5 sm:space-y-6">
+            {/* Live Weather Card */}
             {weatherData ? (
               <WeatherCard weather={weatherData.current} isLoading={isLoading} />
             ) : (
@@ -174,7 +171,7 @@ function DashboardContent() {
               </div>
             )}
 
-            {/* Landslide Risk Assessment Card with SHAP & Explainable AI */}
+            {/* Landslide Hazard Risk Card */}
             {predictionData ? (
               <LandslideRiskCard
                 prediction={predictionData}
@@ -189,34 +186,28 @@ function DashboardContent() {
           </div>
         </div>
 
-        {/* Prediction Timeline Horizon Progression (+72 Hours) */}
+        {/* 72-Hour Prediction Timeline */}
         {timelineData && (
           <RiskTimeline timeline={timelineData.timeline} isLoading={isLoading} />
         )}
 
-        {/* Weather & Meteorological Forecasting Charts */}
+        {/* Meteorological Forecast Charts */}
         {weatherData && (
           <WeatherCharts hourly={weatherData.hourly} daily={weatherData.daily} />
         )}
       </main>
 
-      {/* Footer */}
-      <footer className="w-full border-t border-slate-200 dark:border-slate-800/80 glass-panel bg-white/80 dark:bg-slate-950/80 py-6 text-center text-xs text-slate-500 dark:text-slate-400 space-y-1 transition-colors duration-300">
+      {/* Clean In-App Footer */}
+      <footer className="w-full border-t border-slate-200/80 dark:border-slate-800/80 glass-panel bg-white/70 dark:bg-slate-950/70 py-4 text-center text-xs text-slate-500 dark:text-slate-400 space-y-1 transition-colors duration-300">
         <p className="font-semibold text-slate-700 dark:text-slate-300">
-          TERRA-GUARD &copy; {new Date().getFullYear()} Weather Forecast & Landslide Risk Prediction Platform.
+          Weather Analysis &amp; Landslide Hazard Forecast
         </p>
-        <p className="text-[11px] text-slate-500 dark:text-slate-400 max-w-xl mx-auto px-4">
-          All predictions are AI-based risk estimates calculated from multi-factor geotechnical and meteorological models.
-          Always follow official warnings from local disaster management authorities.
+        <p className="text-[11px] text-slate-400 dark:text-slate-500 max-w-lg mx-auto px-4">
+          Real-time geotechnical and meteorological risk estimation. Always follow alerts from local disaster management authorities.
         </p>
       </footer>
 
-      {/* Modals & Drawers */}
-      <ModelMetricsModal
-        isOpen={isMetricsOpen}
-        onClose={() => setIsMetricsOpen(false)}
-      />
-
+      {/* Saved Locations & History Drawer */}
       <SavedLocationsDrawer
         isOpen={isSavedOpen}
         onClose={() => setIsSavedOpen(false)}
@@ -238,4 +229,3 @@ export function App() {
 }
 
 export default App;
-

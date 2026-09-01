@@ -3,11 +3,12 @@ import {
   ShieldAlert,
   Sliders,
   CheckCircle2,
-  Brain,
+  Activity,
   Info,
   ChevronDown,
   ChevronUp,
-  Sparkles
+  Sparkles,
+  RotateCcw
 } from 'lucide-react';
 import { LandslidePredictionResponse, RiskLevel } from '../types';
 
@@ -19,39 +20,35 @@ interface LandslideRiskCardProps {
 
 const RISK_BADGE_CONFIG: Record<
   RiskLevel,
-  { label: string; textClass: string; bgClass: string; borderClass: string; barClass: string; glowClass: string }
+  { label: string; textClass: string; bgClass: string; borderClass: string; barClass: string }
 > = {
   LOW: {
     label: 'LOW RISK',
-    textClass: 'text-emerald-700 dark:text-emerald-400',
-    bgClass: 'bg-emerald-500/10 dark:bg-emerald-500/15',
+    textClass: 'text-emerald-400',
+    bgClass: 'bg-emerald-500/15',
     borderClass: 'border-emerald-500/30',
     barClass: 'bg-emerald-500',
-    glowClass: 'shadow-[0_4px_25px_rgba(16,185,129,0.15)] dark:shadow-[0_0_20px_rgba(16,185,129,0.3)]',
   },
   MODERATE: {
     label: 'MODERATE RISK',
-    textClass: 'text-amber-700 dark:text-amber-400',
-    bgClass: 'bg-amber-500/10 dark:bg-amber-500/15',
+    textClass: 'text-amber-400',
+    bgClass: 'bg-amber-500/15',
     borderClass: 'border-amber-500/30',
     barClass: 'bg-amber-500',
-    glowClass: 'shadow-[0_4px_25px_rgba(245,158,11,0.15)] dark:shadow-[0_0_20px_rgba(245,158,11,0.3)]',
   },
   HIGH: {
     label: 'HIGH RISK',
-    textClass: 'text-orange-700 dark:text-orange-400',
-    bgClass: 'bg-orange-500/15 dark:bg-orange-500/20',
+    textClass: 'text-orange-400',
+    bgClass: 'bg-orange-500/20',
     borderClass: 'border-orange-500/40',
     barClass: 'bg-orange-500',
-    glowClass: 'shadow-[0_4px_30px_rgba(249,115,22,0.2)] dark:shadow-[0_0_25px_rgba(249,115,22,0.4)]',
   },
   'VERY HIGH': {
-    label: 'VERY HIGH RISK',
-    textClass: 'text-rose-700 dark:text-rose-400',
-    bgClass: 'bg-rose-500/15 dark:bg-rose-500/25',
+    label: 'CRITICAL RISK',
+    textClass: 'text-rose-400',
+    bgClass: 'bg-rose-500/25',
     borderClass: 'border-rose-500/60',
     barClass: 'bg-rose-500',
-    glowClass: 'shadow-[0_4px_35px_rgba(239,68,68,0.25)] dark:shadow-[0_0_30px_rgba(239,68,68,0.5)]',
   },
 };
 
@@ -81,24 +78,24 @@ export const LandslideRiskCard: React.FC<LandslideRiskCardProps> = ({
   };
 
   return (
-    <div className={`w-full glass-panel bg-white/80 dark:bg-slate-900/80 rounded-2xl p-5 border border-slate-200/90 dark:border-slate-800 shadow-2xl relative overflow-hidden transition-all duration-500 ${badge.glowClass}`}>
-      {/* Top Banner & AI Model Version */}
-      <div className="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-800/80 mb-4">
+    <div className="w-full glass-panel bg-slate-900/80 rounded-2xl p-5 border border-slate-800 shadow-xl relative overflow-hidden transition-all duration-300">
+      {/* Header */}
+      <div className="flex items-center justify-between pb-3 border-b border-slate-800/80 mb-4">
         <div className="flex items-center gap-2">
-          <div className="p-1.5 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-600 dark:text-indigo-400">
-            <Brain className="w-4 h-4" />
+          <div className="p-1.5 rounded-lg bg-blue-500/10 border border-blue-500/30 text-blue-400">
+            <Activity className="w-4 h-4" />
           </div>
-          <h3 className="font-bold text-slate-900 dark:text-slate-100 text-sm tracking-wide">
-            Landslide Risk Assessment
+          <h3 className="font-bold text-white text-sm tracking-wide">
+            Landslide Hazard Assessment
           </h3>
         </div>
         <div className="flex items-center gap-2">
-          <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400">
-            Conf: <strong className="text-slate-800 dark:text-slate-200">{(prediction.confidence * 100).toFixed(0)}%</strong>
+          <span className="text-[11px] font-medium text-slate-400">
+            Confidence: <strong className="text-slate-200">{(prediction.confidence * 100).toFixed(0)}%</strong>
           </span>
           <button
             onClick={() => setShowSim(!showSim)}
-            className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-700 text-cyan-700 dark:text-cyan-400 border border-slate-200 dark:border-slate-700 transition-all shadow-sm"
+            className="flex items-center gap-1 text-[11px] font-semibold px-2.5 py-1 rounded-lg bg-slate-800/90 hover:bg-slate-700 text-blue-400 border border-slate-700 transition-all shadow-sm"
           >
             <Sliders className="w-3 h-3" />
             <span>Simulate</span>
@@ -108,13 +105,13 @@ export const LandslideRiskCard: React.FC<LandslideRiskCardProps> = ({
       </div>
 
       {/* Main Risk Display */}
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-xl bg-slate-50/90 dark:bg-slate-900/70 border border-slate-200 dark:border-slate-800 mb-4">
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 p-4 rounded-xl bg-slate-900/90 border border-slate-800/90 mb-4">
         <div className="flex items-center gap-3.5">
           <div className={`w-12 h-12 rounded-2xl flex items-center justify-center border ${badge.bgClass} ${badge.borderClass}`}>
             <ShieldAlert className={`w-7 h-7 ${badge.textClass} ${prediction.risk_level === 'VERY HIGH' ? 'animate-bounce' : ''}`} />
           </div>
           <div>
-            <div className="text-[11px] text-slate-500 dark:text-slate-400 uppercase tracking-wider font-semibold">Predicted Threat</div>
+            <div className="text-[11px] text-slate-400 uppercase tracking-wider font-semibold">Hazard Status</div>
             <div className={`text-xl sm:text-2xl font-black tracking-tight ${badge.textClass}`}>
               {badge.label}
             </div>
@@ -124,10 +121,10 @@ export const LandslideRiskCard: React.FC<LandslideRiskCardProps> = ({
         {/* Probability Gauge */}
         <div className="w-full sm:w-48 flex flex-col items-end">
           <div className="flex items-baseline gap-1 mb-1">
-            <span className="text-xs font-medium text-slate-500 dark:text-slate-400">Probability:</span>
-            <span className="text-2xl font-black font-mono text-slate-900 dark:text-white">{probPercent}%</span>
+            <span className="text-xs font-medium text-slate-400">Risk Probability:</span>
+            <span className="text-2xl font-black font-mono text-white">{probPercent}%</span>
           </div>
-          <div className="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-2.5 overflow-hidden p-0.5 border border-slate-300 dark:border-slate-700">
+          <div className="w-full bg-slate-800 rounded-full h-2.5 overflow-hidden p-0.5 border border-slate-700">
             <div
               className={`h-full rounded-full transition-all duration-700 ${badge.barClass}`}
               style={{ width: `${Math.max(4, probPercent)}%` }}
@@ -138,24 +135,24 @@ export const LandslideRiskCard: React.FC<LandslideRiskCardProps> = ({
 
       {/* What-If Simulation Drawer */}
       {showSim && (
-        <div className="mb-4 p-4 rounded-xl bg-slate-50/95 dark:bg-slate-950/90 border border-cyan-500/40 text-xs shadow-inner">
-          <div className="flex items-center justify-between font-bold text-cyan-700 dark:text-cyan-300 mb-3">
+        <div className="mb-4 p-4 rounded-xl bg-slate-950/90 border border-blue-500/40 text-xs shadow-inner animate-fadeIn">
+          <div className="flex items-center justify-between font-bold text-blue-300 mb-3">
             <span className="flex items-center gap-1.5">
-              <Sparkles className="w-3.5 h-3.5" /> What-If Parameter Simulation
+              <Sparkles className="w-3.5 h-3.5" /> What-If Scenario Simulation
             </span>
             <button
               onClick={handleResetSim}
-              className="text-[11px] text-slate-500 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 underline font-medium"
+              className="flex items-center gap-1 text-[11px] text-slate-400 hover:text-rose-400 font-medium"
             >
-              Reset Live Defaults
+              <RotateCcw className="w-3 h-3" /> Reset Defaults
             </button>
           </div>
 
           <div className="space-y-3 mb-3">
             <div>
-              <div className="flex justify-between text-slate-700 dark:text-slate-300 mb-1 font-medium">
+              <div className="flex justify-between text-slate-300 mb-1 font-medium">
                 <span>Simulated 24h Rainfall:</span>
-                <span className="font-mono font-bold text-cyan-700 dark:text-cyan-400">{simRain} mm</span>
+                <span className="font-mono font-bold text-blue-400">{simRain} mm</span>
               </div>
               <input
                 type="range"
@@ -163,14 +160,14 @@ export const LandslideRiskCard: React.FC<LandslideRiskCardProps> = ({
                 max="250"
                 value={simRain}
                 onChange={(e) => setSimRain(Number(e.target.value))}
-                className="w-full accent-cyan-600 h-2 bg-slate-200 dark:bg-slate-800 rounded-lg cursor-pointer"
+                className="w-full accent-blue-500 h-2 bg-slate-800 rounded-lg cursor-pointer"
               />
             </div>
 
             <div>
-              <div className="flex justify-between text-slate-700 dark:text-slate-300 mb-1 font-medium">
-                <span>Simulated Slope:</span>
-                <span className="font-mono font-bold text-cyan-700 dark:text-cyan-400">{simSlope}°</span>
+              <div className="flex justify-between text-slate-300 mb-1 font-medium">
+                <span>Simulated Slope Angle:</span>
+                <span className="font-mono font-bold text-blue-400">{simSlope}°</span>
               </div>
               <input
                 type="range"
@@ -178,14 +175,14 @@ export const LandslideRiskCard: React.FC<LandslideRiskCardProps> = ({
                 max="75"
                 value={simSlope}
                 onChange={(e) => setSimSlope(Number(e.target.value))}
-                className="w-full accent-cyan-600 h-2 bg-slate-200 dark:bg-slate-800 rounded-lg cursor-pointer"
+                className="w-full accent-blue-500 h-2 bg-slate-800 rounded-lg cursor-pointer"
               />
             </div>
 
             <div>
-              <div className="flex justify-between text-slate-700 dark:text-slate-300 mb-1 font-medium">
+              <div className="flex justify-between text-slate-300 mb-1 font-medium">
                 <span>Simulated Soil Saturation:</span>
-                <span className="font-mono font-bold text-cyan-700 dark:text-cyan-400">{Math.round(simMoisture * 100)}%</span>
+                <span className="font-mono font-bold text-blue-400">{Math.round(simMoisture * 100)}%</span>
               </div>
               <input
                 type="range"
@@ -194,76 +191,75 @@ export const LandslideRiskCard: React.FC<LandslideRiskCardProps> = ({
                 step="0.05"
                 value={simMoisture}
                 onChange={(e) => setSimMoisture(Number(e.target.value))}
-                className="w-full accent-cyan-600 h-2 bg-slate-200 dark:bg-slate-800 rounded-lg cursor-pointer"
+                className="w-full accent-blue-500 h-2 bg-slate-800 rounded-lg cursor-pointer"
               />
             </div>
           </div>
 
           <button
             onClick={handleApplySim}
-            className="w-full py-2 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-bold transition-all shadow-md active:scale-95"
+            className="w-full py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold transition-all shadow-md active:scale-95"
           >
-            Re-evaluate Model Risk
+            Re-evaluate Scenario Risk
           </button>
         </div>
       )}
 
-      {/* Explainable AI (SHAP) Section */}
+      {/* Risk Drivers Breakdown Section */}
       <div className="mb-4">
         <div className="flex items-center justify-between mb-2">
-          <span className="text-xs font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
-            <Brain className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400" />
-            Why is the risk evaluated at this level?
+          <span className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
+            <Activity className="w-3.5 h-3.5 text-blue-400" />
+            Key Environmental Risk Drivers
           </span>
-          <span className="text-[10px] text-slate-500 italic">SHAP Feature Contributions</span>
+          <span className="text-[10px] text-slate-400 font-medium">Factor Impact</span>
         </div>
 
-        <div className="space-y-2 bg-slate-50/80 dark:bg-slate-900/40 p-3 rounded-xl border border-slate-200/90 dark:border-slate-800/80">
+        <div className="space-y-2 bg-slate-900/50 p-3 rounded-xl border border-slate-800/80">
           {prediction.shap_contributions && prediction.shap_contributions.length > 0 ? (
             prediction.shap_contributions.map((item, idx) => (
               <div key={idx} className="space-y-1">
                 <div className="flex justify-between text-[11px]">
-                  <span className="text-slate-700 dark:text-slate-300 font-medium">{item.label}</span>
-                  <span className="font-mono text-slate-600 dark:text-slate-400 font-bold">{item.contribution_pct}%</span>
+                  <span className="text-slate-300 font-medium">{item.label}</span>
+                  <span className="font-mono text-slate-400 font-bold">{item.contribution_pct}%</span>
                 </div>
-                <div className="w-full bg-slate-200 dark:bg-slate-800 rounded-full h-1.5 overflow-hidden">
+                <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
                   <div
-                    className="h-full bg-gradient-to-r from-cyan-500 to-indigo-500 rounded-full transition-all duration-700"
+                    className="h-full bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full transition-all duration-700"
                     style={{ width: `${Math.min(100, Math.max(5, item.contribution_pct))}%` }}
                   />
                 </div>
               </div>
             ))
           ) : (
-            <div className="text-xs text-slate-500 italic">Calculating feature contributions...</div>
+            <div className="text-xs text-slate-500 italic">Evaluating environmental drivers...</div>
           )}
         </div>
       </div>
 
-      {/* Major Risk Factors Checklist */}
+      {/* Contributing Hazard Factors Checklist */}
       <div className="mb-4">
-        <div className="text-xs font-bold text-slate-800 dark:text-slate-200 mb-2">Major Contributing Factors:</div>
+        <div className="text-xs font-bold text-slate-200 mb-2">Active Contributing Factors:</div>
         <div className="grid grid-cols-1 gap-1.5">
           {prediction.factors.map((factor, idx) => (
             <div
               key={idx}
-              className="flex items-center gap-2 text-xs text-slate-800 dark:text-slate-200 bg-slate-50/80 dark:bg-slate-900/50 px-3 py-1.5 rounded-lg border border-slate-200 dark:border-slate-800"
+              className="flex items-center gap-2 text-xs text-slate-200 bg-slate-900/60 px-3 py-1.5 rounded-lg border border-slate-800"
             >
-              <CheckCircle2 className="w-3.5 h-3.5 text-cyan-600 dark:text-cyan-400 shrink-0" />
+              <CheckCircle2 className="w-3.5 h-3.5 text-blue-400 shrink-0" />
               <span className="font-medium">{factor}</span>
             </div>
           ))}
         </div>
       </div>
 
-      {/* Safety Disclaimer */}
-      <div className="p-3 rounded-xl bg-slate-50 dark:bg-slate-900/80 border border-slate-200 dark:border-slate-800 text-[11px] text-slate-600 dark:text-slate-400 flex items-start gap-2">
-        <Info className="w-4 h-4 text-cyan-600 dark:text-cyan-400 shrink-0 mt-0.5" />
+      {/* Safety Advisory Disclaimer */}
+      <div className="p-3 rounded-xl bg-slate-900/80 border border-slate-800 text-[11px] text-slate-400 flex items-start gap-2">
+        <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
         <span>
-          <strong className="text-slate-800 dark:text-slate-300">Disclaimer:</strong> {prediction.disclaimer}
+          <strong className="text-slate-300">Advisory:</strong> {prediction.disclaimer}
         </span>
       </div>
     </div>
   );
 };
-

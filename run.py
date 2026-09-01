@@ -64,6 +64,7 @@ def run_combined(host="127.0.0.1", port=8000, reload=False, open_browser=True):
             sys.path.insert(0, p)
             
     import uvicorn
+    # pyrefly: ignore [missing-import]
     from app.main import app
 
     target_url = f"http://{host}:{port}"
