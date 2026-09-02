@@ -1,16 +1,21 @@
 import React from 'react';
 import {
-  CloudSun,
   Bookmark,
   RefreshCw,
   Sun,
-  Moon
+  Moon,
+  ArrowLeft,
+  Navigation,
+  Shield,
+  Activity,
+  Compass
 } from 'lucide-react';
 import { LocationSearchBar } from './LocationSearchBar';
 import { RiskLevel } from '../types';
 import { useTheme } from '../context/ThemeContext';
 
 interface NavbarProps {
+  onBackToNavigation: () => void;
   onSelectCoordinates: (lat: number, lon: number, name?: string) => void;
   currentLat: number;
   currentLon: number;
@@ -22,6 +27,7 @@ interface NavbarProps {
 }
 
 export const Navbar: React.FC<NavbarProps> = ({
+  onBackToNavigation,
   onSelectCoordinates,
   currentLat,
   currentLon,
@@ -33,22 +39,31 @@ export const Navbar: React.FC<NavbarProps> = ({
   const { theme, toggleTheme } = useTheme();
 
   return (
-    <header className="sticky top-0 z-[1100] w-full border-b border-slate-800/80 glass-panel bg-slate-950/80 backdrop-blur-xl transition-colors duration-300">
+    <header className="sticky top-0 z-[1100] w-full border-b border-slate-800/80 glass-panel bg-slate-950/85 backdrop-blur-2xl transition-colors duration-300">
       <div className="max-w-7xl mx-auto px-3 sm:px-6 py-2.5 flex flex-col md:flex-row items-center justify-between gap-3">
-        {/* App Section Header */}
+        {/* Left: Back Button to Bharat Netra & Brand Logo */}
         <div className="flex items-center justify-between w-full md:w-auto gap-3">
+          <button
+            onClick={onBackToNavigation}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-2xl bg-emerald-950/40 hover:bg-emerald-900/60 border border-emerald-500/50 text-emerald-300 hover:text-white transition-all shadow-md active:scale-95 group text-xs font-bold"
+            title="Return to Bharat Netra Safe Road Navigation"
+          >
+            <ArrowLeft className="w-4 h-4 text-emerald-400 group-hover:-translate-x-1 transition-transform" />
+            <span className="hidden sm:inline">Bharat Netra Nav</span>
+          </button>
+
           <div className="flex items-center gap-2.5">
             <img
               src="/weather_logo.png"
               alt="Weather Analysis Logo"
-              className="w-9 h-9 rounded-xl object-cover shadow-lg border border-white/10 ring-1 ring-blue-500/40"
+              className="w-8 h-8 rounded-xl object-cover shadow-lg border border-white/10 ring-1 ring-blue-500/40"
             />
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="font-bold text-base tracking-tight text-white">
+                <h1 className="font-extrabold text-sm sm:text-base tracking-tight text-white">
                   Weather Analysis
                 </h1>
-                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
+                <span className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-400 border border-emerald-500/30">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                   Live
                 </span>
@@ -56,7 +71,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             </div>
           </div>
 
-          {/* Quick Actions (Visible on Mobile) */}
+          {/* Quick Mobile Controls */}
           <div className="flex items-center gap-1.5 md:hidden">
             <button
               onClick={onOpenSavedLocations}
@@ -88,7 +103,7 @@ export const Navbar: React.FC<NavbarProps> = ({
           </div>
         </div>
 
-        {/* Location Search Bar */}
+        {/* Center: Location Search Bar matching Image 3 */}
         <div className="w-full md:flex-1 max-w-md flex items-center justify-center">
           <LocationSearchBar
             onSelectCoordinates={onSelectCoordinates}
@@ -97,9 +112,9 @@ export const Navbar: React.FC<NavbarProps> = ({
           />
         </div>
 
-        {/* Action Controls (Desktop) */}
+        {/* Right: Desktop Action Controls matching Image 3 */}
         <div className="hidden md:flex items-center gap-2">
-          {/* Saved / Bookmarks Drawer Trigger */}
+          {/* Saved / Bookmarks */}
           <button
             onClick={onOpenSavedLocations}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 text-xs font-semibold text-slate-200 hover:text-blue-300 transition-all shadow-sm active:scale-95 relative"
@@ -125,7 +140,7 @@ export const Navbar: React.FC<NavbarProps> = ({
             <span>Refresh</span>
           </button>
 
-          {/* Theme Toggle Button */}
+          {/* Theme Toggle */}
           <button
             onClick={toggleTheme}
             className="flex items-center justify-center p-2 rounded-xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 text-slate-200 hover:text-blue-300 transition-all shadow-sm active:scale-95"
