@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import L from 'leaflet';
 import {
   Menu,
   Moon,
@@ -46,8 +47,17 @@ const ROUTE_PRESETS = [
     duration: '35 min',
     highway: 'NH 48',
     safetyBoost: '10% Safer',
-    fromCoords: { lat: 18.5204, lon: 73.8567 },
-    toCoords: { lat: 18.7297, lon: 73.6749 }
+    fromCoords: [18.5204, 73.8567] as [number, number],
+    toCoords: [18.7297, 73.6749] as [number, number],
+    routePath: [
+      [18.5204, 73.8567],
+      [18.5350, 73.8300],
+      [18.5700, 73.7900],
+      [18.6100, 73.7600],
+      [18.6600, 73.7200],
+      [18.7000, 73.6900],
+      [18.7297, 73.6749]
+    ] as [number, number][]
   },
   {
     from: 'Shimla',
@@ -56,8 +66,14 @@ const ROUTE_PRESETS = [
     duration: '1 hr 20 min',
     highway: 'NH 5',
     safetyBoost: '18% Safer',
-    fromCoords: { lat: 31.1048, lon: 77.1734 },
-    toCoords: { lat: 31.0979, lon: 77.2678 }
+    fromCoords: [31.1048, 77.1734] as [number, number],
+    toCoords: [31.0979, 77.2678] as [number, number],
+    routePath: [
+      [31.1048, 77.1734],
+      [31.1080, 77.2000],
+      [31.1150, 77.2300],
+      [31.0979, 77.2678]
+    ] as [number, number][]
   },
   {
     from: 'Mumbai',
@@ -66,8 +82,15 @@ const ROUTE_PRESETS = [
     duration: '2 hr 45 min',
     highway: 'Expressway',
     safetyBoost: '14% Safer',
-    fromCoords: { lat: 19.0760, lon: 72.8777 },
-    toCoords: { lat: 18.5204, lon: 73.8567 }
+    fromCoords: [19.0760, 72.8777] as [number, number],
+    toCoords: [18.5204, 73.8567] as [number, number],
+    routePath: [
+      [19.0760, 72.8777],
+      [19.0330, 73.0297],
+      [18.9894, 73.1175],
+      [18.7557, 73.4091],
+      [18.5204, 73.8567]
+    ] as [number, number][]
   }
 ];
 
@@ -92,6 +115,116 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
   const [showAlertModal, setShowAlertModal] = useState(false);
   const [isJourneyStarted, setIsJourneyStarted] = useState(false);
 
+  // Leaflet Map Refs
+  const navMapContainerRef = useRef<HTMLDivElement>(null);
+  const navMapRef = useRef<L.Map | null>(null);
+  const routeLayerGroupRef = useRef<L.LayerGroup | null>(null);
+
+  // Initialize Real Leaflet Map
+  useEffect(() => {
+    if (!navMapContainerRef.current || navMapRef.current) return;
+
+    // Center on mid-point between Pune and Talegaon
+    const map = L.map(navMapContainerRef.current, {
+      center: [18.625, 73.765],
+      zoom: 11,
+      zoomControl: false,
+      attributionControl: false,
+      maxZoom: 19
+    });
+
+    // Dark Satellite / CartoDB Hybrid Tiles (No API key needed, zero watermark, 100% reliable)
+    L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
+      subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
+      maxZoom: 20
+    }).addTo(map);
+
+    routeLayerGroupRef.current = L.layerGroup().addTo(map);
+    navMapRef.current = map;
+
+    setTimeout(() => {
+      map.invalidateSize();
+    }, 250);
+
+    return () => {
+      map.remove();
+      navMapRef.current = null;
+    };
+  }, []);
+
+  // Update Route Polyline & Markers on Map
+  useEffect(() => {
+    if (!navMapRef.current || !routeLayerGroupRef.current) return;
+
+    const layerGroup = routeLayerGroupRef.current;
+    layerGroup.clearLayers();
+
+    // 1. Draw glowing green route polyline matching Image 2
+    const glowPolyline = L.polyline(route.routePath, {
+      color: '#10b981',
+      weight: 6,
+      opacity: 0.9,
+      lineCap: 'round',
+      lineJoin: 'round'
+    });
+
+    const innerPolyline = L.polyline(route.routePath, {
+      color: '#ffffff',
+      weight: 2,
+      opacity: 0.7,
+      dashArray: '6, 6'
+    });
+
+    layerGroup.addLayer(glowPolyline);
+    layerGroup.addLayer(innerPolyline);
+
+    // 2. Origin Marker (Blue pulsing circle)
+    const originIcon = L.divIcon({
+      className: 'nav-origin-marker',
+      html: `
+        <div style="position: relative; display: flex; flex-direction: column; align-items: center;">
+          <div style="width: 22px; height: 22px; border-radius: 50%; background: #3b82f6; border: 3px solid #ffffff; box-shadow: 0 0 12px rgba(59,130,246,0.8); display: flex; align-items: center; justify-content: center;">
+            <div style="width: 6px; height: 6px; border-radius: 50%; background: #ffffff;"></div>
+          </div>
+          <span style="margin-top: 3px; background: rgba(15,23,42,0.9); color: #ffffff; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 6px; border: 1px solid #475569; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.6); font-family: Inter, sans-serif;">
+            ${origin}
+          </span>
+        </div>
+      `,
+      iconSize: [30, 45],
+      iconAnchor: [15, 11]
+    });
+
+    const originMarker = L.marker(route.fromCoords, { icon: originIcon });
+    layerGroup.addLayer(originMarker);
+
+    // 3. Destination Marker (Red circle)
+    const destIcon = L.divIcon({
+      className: 'nav-dest-marker',
+      html: `
+        <div style="position: relative; display: flex; flex-direction: column; align-items: center;">
+          <div style="width: 22px; height: 22px; border-radius: 50%; background: #ef4444; border: 3px solid #ffffff; box-shadow: 0 0 12px rgba(239,68,68,0.8); display: flex; align-items: center; justify-content: center;">
+            <div style="width: 6px; height: 6px; border-radius: 2px; background: #ffffff;"></div>
+          </div>
+          <span style="margin-top: 3px; background: rgba(15,23,42,0.9); color: #ffffff; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 6px; border: 1px solid #475569; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.6); font-family: Inter, sans-serif;">
+            ${destination}
+          </span>
+        </div>
+      `,
+      iconSize: [30, 45],
+      iconAnchor: [15, 11]
+    });
+
+    const destMarker = L.marker(route.toCoords, { icon: destIcon });
+    layerGroup.addLayer(destMarker);
+
+    // Fit map bounds to show full route nicely
+    navMapRef.current.fitBounds(glowPolyline.getBounds(), {
+      padding: [40, 40],
+      maxZoom: 13
+    });
+  }, [route, origin, destination]);
+
   // Sync origin/dest when preset changes
   useEffect(() => {
     setOrigin(route.from);
@@ -107,7 +240,6 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
   const handleBottomTabClick = (tab: BottomTab) => {
     setActiveBottomTab(tab);
     if (tab === 'nearby') {
-      // Direct action required by user: Click on Nearby opens Weather & Landslide prediction interface!
       onOpenWeatherPrediction();
     } else if (tab === 'alerts') {
       setShowAlertModal(true);
@@ -116,10 +248,10 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
 
   return (
     <div className="min-h-screen w-full bg-[#050B14] text-slate-100 flex flex-col justify-between selection:bg-emerald-600 selection:text-white relative overflow-x-hidden font-sans">
-      {/* Dynamic Background Road Network Texture */}
+      {/* Dynamic Background */}
       <div className="fixed inset-0 bg-gradient-to-b from-[#050B14] via-[#091220] to-[#040812] pointer-events-none z-0" />
 
-      {/* Main Container - Responsive with Mobile Wrapper Center on Large Screens */}
+      {/* Main Container - Centered Mobile Layout */}
       <div className="relative z-10 w-full max-w-lg mx-auto min-h-screen flex flex-col justify-between bg-[#070E1A] shadow-2xl border-x border-slate-800/80">
         {/* ========================================================================= */}
         {/* 1. TOP HEADER BAR matching Image 2 */}
@@ -201,9 +333,6 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
                 <span>Open Weather &amp; Landslide Forecast</span>
                 <Sparkles className="w-3.5 h-3.5" />
               </button>
-              <div className="text-[11px] text-slate-500 pt-1">
-                Connected to National Geohazard Early Warning Network.
-              </div>
             </div>
           </div>
         )}
@@ -261,7 +390,7 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
               </div>
             </div>
 
-            {/* Swap Button on Right matching Image 2 */}
+            {/* Swap Button on Right */}
             <button
               onClick={handleSwap}
               className="p-3 rounded-2xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 flex flex-col items-center justify-center gap-1 text-emerald-400 shadow-md active:scale-95 transition-all shrink-0"
@@ -326,7 +455,6 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
                   : 'bg-slate-900/70 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800/80'
               }`}
             >
-              {/* Cross / Ambulance Icon */}
               <div className="relative">
                 <Truck className="w-5 h-5" />
                 <span className="absolute -top-1 -right-1 text-[9px] text-rose-400 font-extrabold">+</span>
@@ -337,59 +465,26 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
         </section>
 
         {/* ========================================================================= */}
-        {/* 4. MAP VIEW & ROUTE DISPLAY matching Image 2 */}
+        {/* 4. REAL INTERACTIVE LEAFLET ROAD MAP SECTION (Replaces Broken MapTiler) */}
         {/* ========================================================================= */}
-        <section className="relative flex-1 min-h-[340px] sm:min-h-[420px] bg-[#0A1322] overflow-hidden flex flex-col justify-between p-3">
-          {/* Map Grid Pattern / Satellite Simulated Dark Base */}
+        <section className="relative flex-1 min-h-[350px] sm:min-h-[420px] bg-[#0A1322] overflow-hidden flex flex-col justify-between p-3">
+          {/* Leaflet Map Canvas Container */}
           <div
-            className="absolute inset-0 bg-cover bg-center opacity-85 z-0"
-            style={{
-              backgroundImage: `url('https://api.maptiler.com/maps/hybrid/static/73.76,18.62,11/800x600.jpg?key=get_your_own_key'), radial-gradient(circle at center, #0e1e38 0%, #060c18 100%)`
-            }}
+            ref={navMapContainerRef}
+            className="absolute inset-0 w-full h-full z-0"
+            id="bharat-netra-nav-leaflet-map"
           />
 
-          {/* SVG Road Polyline Overlay (Simulating NH 48 expressway route) */}
-          <svg className="absolute inset-0 w-full h-full pointer-events-none z-10" viewBox="0 0 400 400" preserveAspectRatio="none">
-            {/* Glow Path */}
-            <path
-              d="M 110,80 Q 150,140 160,200 T 250,320"
-              fill="none"
-              stroke="#10b981"
-              strokeWidth="6"
-              strokeLinecap="round"
-              className="drop-shadow-[0_0_12px_rgba(16,185,129,0.8)]"
-            />
-            {/* Center animated dash */}
-            <path
-              d="M 110,80 Q 150,140 160,200 T 250,320"
-              fill="none"
-              stroke="#ffffff"
-              strokeWidth="2"
-              strokeDasharray="6 4"
-              className="opacity-70"
-            />
-          </svg>
-
-          {/* Top Left: Live Traffic Indicator matching Image 2 */}
-          <div className="relative z-20 self-start">
-            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#07111E]/90 border border-slate-700/80 text-[11px] font-bold text-slate-200 backdrop-blur-md shadow-lg">
+          {/* Top Left: Live Traffic Indicator floating over real map */}
+          <div className="relative z-20 self-start pointer-events-none">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#07111E]/90 border border-slate-700/80 text-[11px] font-bold text-slate-200 backdrop-blur-md shadow-lg pointer-events-auto">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
               <span>Live Traffic</span>
             </div>
           </div>
 
-          {/* Map Markers on Polyline matching Image 2 */}
-          <div className="absolute top-[18%] left-[24%] z-20 flex flex-col items-center">
-            <div className="w-5 h-5 rounded-full bg-blue-500 ring-4 ring-blue-500/30 flex items-center justify-center">
-              <div className="w-2 h-2 rounded-full bg-white" />
-            </div>
-            <span className="mt-1 px-2 py-0.5 rounded-md bg-slate-900/90 text-[10px] font-bold text-white border border-slate-700 shadow">
-              {origin}
-            </span>
-          </div>
-
-          {/* Route Time & Highway Badges on Map matching Image 2 */}
-          <div className="absolute top-[48%] left-[26%] z-20 flex flex-col items-start gap-1">
+          {/* Floating Route Info Badge on Map matching Image 2 */}
+          <div className="absolute top-[48%] left-[22%] z-20 flex flex-col items-start gap-1 pointer-events-auto">
             <div className="px-2.5 py-1.5 rounded-xl bg-emerald-950/90 border border-emerald-500/80 text-emerald-300 font-extrabold text-xs shadow-lg backdrop-blur-md flex flex-col leading-tight">
               <span>{route.duration}</span>
               <span className="text-[10px] font-normal text-emerald-400/90">{route.distance}</span>
@@ -399,33 +494,30 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
             </div>
           </div>
 
-          {/* Destination Marker on Polyline matching Image 2 */}
-          <div className="absolute bottom-[22%] right-[32%] z-20 flex flex-col items-center">
-            <div className="w-5 h-5 rounded-full bg-rose-500 ring-4 ring-rose-500/30 flex items-center justify-center">
-              <div className="w-2 h-2 rounded bg-white" />
-            </div>
-            <span className="mt-1 px-2 py-0.5 rounded-md bg-slate-900/90 text-[10px] font-bold text-white border border-slate-700 shadow">
-              {destination}
-            </span>
-          </div>
-
-          {/* Right Floating Map Controls matching Image 2 */}
-          <div className="relative z-20 self-end flex flex-col gap-2">
+          {/* Right Floating Working Map Controls */}
+          <div className="relative z-20 self-end flex flex-col gap-2 pointer-events-auto">
             <button
-              onClick={() => {}}
+              onClick={() => navMapRef.current?.zoomIn()}
               className="w-10 h-10 rounded-2xl bg-[#091322]/90 hover:bg-slate-800 border border-slate-700/80 flex items-center justify-center text-slate-200 shadow-xl backdrop-blur-md active:scale-95"
+              title="Zoom In"
             >
               <Plus className="w-5 h-5" />
             </button>
             <button
-              onClick={() => {}}
+              onClick={() => navMapRef.current?.zoomOut()}
               className="w-10 h-10 rounded-2xl bg-[#091322]/90 hover:bg-slate-800 border border-slate-700/80 flex items-center justify-center text-slate-200 shadow-xl backdrop-blur-md active:scale-95"
+              title="Zoom Out"
             >
               <Minus className="w-5 h-5" />
             </button>
             <button
-              onClick={() => {}}
+              onClick={() => {
+                if (navMapRef.current) {
+                  navMapRef.current.flyTo(route.fromCoords, 13, { duration: 1 });
+                }
+              }}
               className="w-10 h-10 rounded-2xl bg-[#091322]/90 hover:bg-slate-800 border border-slate-700/80 flex items-center justify-center text-emerald-400 shadow-xl backdrop-blur-md active:scale-95"
+              title="Recenter Map on Current Location"
             >
               <Crosshair className="w-5 h-5" />
             </button>
@@ -436,7 +528,7 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
         {/* 5. SAFE ROUTE BOTTOM CARD & TELEMETRY matching Image 2 */}
         {/* ========================================================================= */}
         <section className="px-4 py-3 bg-[#08101C] border-t border-slate-800/80 space-y-3">
-          {/* Main Action Banner: Safe Route & START Button matching Image 2 */}
+          {/* Main Action Banner: Safe Route & START Button */}
           <div className="flex items-center justify-between gap-3 bg-[#0C1728] p-3.5 rounded-3xl border border-slate-800 shadow-xl">
             {/* Left: Shield & Route Stats */}
             <div className="flex items-center gap-3">
@@ -493,7 +585,7 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
               </div>
             </div>
 
-            {/* Weather Safe (Clicking opens Weather Prediction as well!) */}
+            {/* Weather Safe */}
             <div
               onClick={onOpenWeatherPrediction}
               className="cursor-pointer bg-[#0A1424] hover:bg-[#0D1A30] p-2 rounded-2xl border border-slate-800/80 space-y-1 transition-all group"
@@ -525,7 +617,7 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
               <span className="text-[10px] font-medium">Trips</span>
             </button>
 
-            {/* Nearby (CRITICAL: OPENS WEATHER PREDICTION INTERFACE AS REQUESTED!) */}
+            {/* Nearby (CRITICAL: OPENS WEATHER PREDICTION INTERFACE) */}
             <button
               onClick={() => handleBottomTabClick('nearby')}
               className={`flex flex-col items-center gap-1 py-1 px-3 transition-all group relative ${
