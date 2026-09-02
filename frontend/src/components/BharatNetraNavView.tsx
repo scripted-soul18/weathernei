@@ -23,11 +23,22 @@ import {
   Radio,
   Sparkles,
   Zap,
-  Info
+  Info,
+  Search,
+  CheckCircle2,
+  TrendingUp,
+  Sliders,
+  Layers
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { WeatherForecastResponse, LandslidePredictionResponse } from '../types';
-import { safeRouteEngine, VehicleType } from '../services/safeRouteEngine';
+import {
+  safeRouteEngine,
+  VehicleType,
+  SafeRouteAnalysisResult,
+  LocationSuggestion,
+  Coordinate
+} from '../services/safeRouteEngine';
 
 interface BharatNetraNavViewProps {
   user: { name: string; role: string; emailOrPhone: string } | null;
@@ -52,39 +63,45 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleType>('truck');
   const [activeBottomTab, setActiveBottomTab] = useState<BottomTab>('start');
 
+  // Locations state
   const [origin, setOrigin] = useState('Pune');
   const [destination, setDestination] = useState('Talegaon');
+  const [originCoords, setOriginCoords] = useState<Coordinate>({ lat: 18.5204, lon: 73.8567 });
+  const [destCoords, setDestCoords] = useState<Coordinate>({ lat: 18.7297, lon: 73.6749 });
+
+  // Autocomplete suggestions
+  const [originSuggestions, setOriginSuggestions] = useState<LocationSuggestion[]>([]);
+  const [destSuggestions, setDestSuggestions] = useState<LocationSuggestion[]>([]);
+  const [activeInput, setActiveInput] = useState<'origin' | 'dest' | null>(null);
+
+  // Safe Route Analysis State
+  const [analysisResult, setAnalysisResult] = useState<SafeRouteAnalysisResult | null>(null);
+  const [selectedRouteType, setSelectedRouteType] = useState<'safe' | 'alternate'>('safe');
+  const [isCalculatingRoute, setIsCalculatingRoute] = useState(false);
+
+  // UI Modals & Navigation state
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showAlertModal, setShowAlertModal] = useState(false);
   const [isJourneyStarted, setIsJourneyStarted] = useState(false);
-
-  // Compute Safe Route with Integrated SafeRouteEngine (from Bharat-Netra repo)
-  const analysisResult = safeRouteEngine.analyzeRoute(
-    origin,
-    destination,
-    selectedVehicle,
-    predictionData?.risk_level
-  );
-  const activeRoute = analysisResult.recommendedRoute;
 
   // Leaflet Map Refs
   const navMapContainerRef = useRef<HTMLDivElement>(null);
   const navMapRef = useRef<L.Map | null>(null);
   const routeLayerGroupRef = useRef<L.LayerGroup | null>(null);
 
-  // Initialize Real Leaflet Map
+  // 1. Initialize Real Leaflet Map
   useEffect(() => {
     if (!navMapContainerRef.current || navMapRef.current) return;
 
     const map = L.map(navMapContainerRef.current, {
-      center: [18.625, 73.765],
+      center: [originCoords.lat, originCoords.lon],
       zoom: 11,
       zoomControl: false,
       attributionControl: false,
       maxZoom: 19
     });
 
-    // Dark Satellite / CartoDB Hybrid Tiles (Zero watermark, no invalid API key)
+    // Dark Satellite / Hybrid Tiles (Zero watermark, fast and responsive)
     L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
       subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
       maxZoom: 20
@@ -95,7 +112,7 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
 
     setTimeout(() => {
       map.invalidateSize();
-    }, 250);
+    }, 300);
 
     return () => {
       map.remove();
@@ -103,66 +120,110 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
     };
   }, []);
 
-  // Update Route Polyline & Markers on Map dynamically whenever route changes
+  // 2. Perform Safe Route Analysis whenever origin, destination, vehicle, or risk changes
   useEffect(() => {
-    if (!navMapRef.current || !routeLayerGroupRef.current) return;
+    let isMounted = true;
+    setIsCalculatingRoute(true);
+
+    safeRouteEngine
+      .analyzeRoute(
+        origin,
+        destination,
+        selectedVehicle,
+        predictionData?.risk_level || 'MODERATE',
+        originCoords,
+        destCoords
+      )
+      .then((res) => {
+        if (isMounted) {
+          setAnalysisResult(res);
+          setIsCalculatingRoute(false);
+        }
+      })
+      .catch((err) => {
+        console.error('Failed to compute safe route:', err);
+        if (isMounted) setIsCalculatingRoute(false);
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, [origin, destination, selectedVehicle, originCoords, destCoords, predictionData?.risk_level]);
+
+  // 3. Render Route & Hazard Overlays on Leaflet Map
+  useEffect(() => {
+    if (!navMapRef.current || !routeLayerGroupRef.current || !analysisResult) return;
 
     const layerGroup = routeLayerGroupRef.current;
     layerGroup.clearLayers();
 
-    // 1. Draw glowing green safe route polyline
-    const glowPolyline = L.polyline(activeRoute.path, {
-      color: '#10b981',
+    const currentRoute =
+      selectedRouteType === 'safe'
+        ? analysisResult.recommendedRoute
+        : analysisResult.alternateRoutes[0] || analysisResult.recommendedRoute;
+
+    // Draw background path (for alternate route preview)
+    if (analysisResult.alternateRoutes.length > 0 && selectedRouteType === 'safe') {
+      const altPolyline = L.polyline(analysisResult.alternateRoutes[0].path, {
+        color: '#f59e0b',
+        weight: 4,
+        opacity: 0.45,
+        dashArray: '8, 8'
+      });
+      layerGroup.addLayer(altPolyline);
+    }
+
+    // Draw Primary Selected Route Polyline
+    const routeColor = selectedRouteType === 'safe' ? '#10b981' : '#f59e0b';
+    const glowPolyline = L.polyline(currentRoute.path, {
+      color: routeColor,
       weight: 6,
-      opacity: 0.9,
+      opacity: 0.95,
       lineCap: 'round',
       lineJoin: 'round'
     });
 
-    const innerPolyline = L.polyline(activeRoute.path, {
+    const innerPolyline = L.polyline(currentRoute.path, {
       color: '#ffffff',
       weight: 2,
-      opacity: 0.7,
-      dashArray: '6, 6'
+      opacity: 0.8,
+      dashArray: '5, 5'
     });
 
     layerGroup.addLayer(glowPolyline);
     layerGroup.addLayer(innerPolyline);
 
-    // 2. Draw hazard avoidance markers from analysisResult
+    // Draw Hazard Markers on Map
     analysisResult.detectedHazards.forEach((hazard) => {
       const hazardCircle = L.circleMarker([hazard.location.lat, hazard.location.lon], {
-        radius: 14,
+        radius: 12,
         fillColor: '#ef4444',
-        color: '#facc15',
+        color: '#ffffff',
         weight: 2,
         opacity: 0.9,
         fillOpacity: 0.75
       });
       hazardCircle.bindTooltip(
-        `<div style="font-family: Inter, sans-serif; font-size: 11px;">
-          <strong style="color: #ef4444;">⚠️ AVOIDED HAZARD</strong><br/>
-          ${hazard.description}
+        `<div style="font-family: Inter, sans-serif; font-size: 11px; padding: 2px;">
+          <strong style="color: #ef4444;">⚠️ GEOHAZARD DETECTED</strong><br/>
+          ${hazard.description}<br/>
+          <span style="color: #10b981; font-weight: bold;">Safe Route Bypassing This Hazard</span>
         </div>`,
         { direction: 'top', offset: [0, -10] }
       );
       layerGroup.addLayer(hazardCircle);
     });
 
-    // 3. Origin Marker (Blue pulsing circle)
-    const originCoords: [number, number] = [
-      analysisResult.originCoords.lat,
-      analysisResult.originCoords.lon
-    ];
-    const originIcon = L.divIcon({
+    // Draw Origin Marker (Blue pulsing circle)
+    const origIcon = L.divIcon({
       className: 'nav-origin-marker',
       html: `
         <div style="position: relative; display: flex; flex-direction: column; align-items: center;">
-          <div style="width: 22px; height: 22px; border-radius: 50%; background: #3b82f6; border: 3px solid #ffffff; box-shadow: 0 0 12px rgba(59,130,246,0.8); display: flex; align-items: center; justify-content: center;">
+          <div style="width: 22px; height: 22px; border-radius: 50%; background: #3b82f6; border: 3px solid #ffffff; box-shadow: 0 0 12px rgba(59,130,246,0.9); display: flex; align-items: center; justify-content: center;">
             <div style="width: 6px; height: 6px; border-radius: 50%; background: #ffffff;"></div>
           </div>
-          <span style="margin-top: 3px; background: rgba(15,23,42,0.9); color: #ffffff; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 6px; border: 1px solid #475569; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.6); font-family: Inter, sans-serif;">
-            ${origin}
+          <span style="margin-top: 3px; background: rgba(15,23,42,0.95); color: #ffffff; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 6px; border: 1px solid #475569; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.6); font-family: Inter, sans-serif;">
+            ${origin.split(',')[0]}
           </span>
         </div>
       `,
@@ -170,23 +231,21 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
       iconAnchor: [15, 11]
     });
 
-    const originMarker = L.marker(originCoords, { icon: originIcon });
-    layerGroup.addLayer(originMarker);
+    const origMarker = L.marker([analysisResult.originCoords.lat, analysisResult.originCoords.lon], {
+      icon: origIcon
+    });
+    layerGroup.addLayer(origMarker);
 
-    // 4. Destination Marker (Red square)
-    const destCoords: [number, number] = [
-      analysisResult.destCoords.lat,
-      analysisResult.destCoords.lon
-    ];
+    // Draw Destination Marker (Red pin)
     const destIcon = L.divIcon({
       className: 'nav-dest-marker',
       html: `
         <div style="position: relative; display: flex; flex-direction: column; align-items: center;">
-          <div style="width: 22px; height: 22px; border-radius: 50%; background: #ef4444; border: 3px solid #ffffff; box-shadow: 0 0 12px rgba(239,68,68,0.8); display: flex; align-items: center; justify-content: center;">
+          <div style="width: 22px; height: 22px; border-radius: 50%; background: #ef4444; border: 3px solid #ffffff; box-shadow: 0 0 12px rgba(239,68,68,0.9); display: flex; align-items: center; justify-content: center;">
             <div style="width: 6px; height: 6px; border-radius: 2px; background: #ffffff;"></div>
           </div>
-          <span style="margin-top: 3px; background: rgba(15,23,42,0.9); color: #ffffff; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 6px; border: 1px solid #475569; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.6); font-family: Inter, sans-serif;">
-            ${destination}
+          <span style="margin-top: 3px; background: rgba(15,23,42,0.95); color: #ffffff; font-size: 10px; font-weight: 800; padding: 2px 6px; border-radius: 6px; border: 1px solid #475569; white-space: nowrap; box-shadow: 0 2px 6px rgba(0,0,0,0.6); font-family: Inter, sans-serif;">
+            ${destination.split(',')[0]}
           </span>
         </div>
       `,
@@ -194,31 +253,76 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
       iconAnchor: [15, 11]
     });
 
-    const destMarker = L.marker(destCoords, { icon: destIcon });
+    const destMarker = L.marker([analysisResult.destCoords.lat, analysisResult.destCoords.lon], {
+      icon: destIcon
+    });
     layerGroup.addLayer(destMarker);
 
-    // Fit map bounds to show full route nicely
-    navMapRef.current.fitBounds(glowPolyline.getBounds(), {
-      padding: [45, 45],
-      maxZoom: 13
-    });
-  }, [activeRoute, origin, destination, analysisResult]);
+    // Fit map bounds to show route
+    if (currentRoute.path.length > 0) {
+      navMapRef.current.fitBounds(glowPolyline.getBounds(), {
+        padding: [45, 45],
+        maxZoom: 14
+      });
+    }
+  }, [analysisResult, selectedRouteType]);
 
-  const handleSwap = () => {
-    const temp = origin;
-    setOrigin(destination);
-    setDestination(temp);
+  // Autocomplete Search Handlers
+  const handleOriginChange = (val: string) => {
+    setOrigin(val);
+    setActiveInput('origin');
+    if (val.length >= 2) {
+      safeRouteEngine.searchLocation(val).then(setOriginSuggestions);
+    } else {
+      setOriginSuggestions([]);
+    }
   };
 
-  const handlePresetSelect = (presetOrigin: string, presetDest: string) => {
-    setOrigin(presetOrigin);
-    setDestination(presetDest);
+  const handleDestChange = (val: string) => {
+    setDestination(val);
+    setActiveInput('dest');
+    if (val.length >= 2) {
+      safeRouteEngine.searchLocation(val).then(setDestSuggestions);
+    } else {
+      setDestSuggestions([]);
+    }
+  };
+
+  const selectOriginSuggestion = (sug: LocationSuggestion) => {
+    setOrigin(sug.shortName);
+    setOriginCoords({ lat: sug.lat, lon: sug.lon });
+    setOriginSuggestions([]);
+    setActiveInput(null);
     if (onSelectCoordinates) {
-      if (presetOrigin.toLowerCase().includes('shimla')) {
-        onSelectCoordinates(31.1048, 77.1734, 'Shimla, Himachal Pradesh');
-      } else {
-        onSelectCoordinates(18.5204, 73.8567, 'Pune, Maharashtra');
-      }
+      onSelectCoordinates(sug.lat, sug.lon, sug.displayName);
+    }
+  };
+
+  const selectDestSuggestion = (sug: LocationSuggestion) => {
+    setDestination(sug.shortName);
+    setDestCoords({ lat: sug.lat, lon: sug.lon });
+    setDestSuggestions([]);
+    setActiveInput(null);
+  };
+
+  const handleSwap = () => {
+    const tempName = origin;
+    const tempCoords = originCoords;
+    setOrigin(destination);
+    setOriginCoords(destCoords);
+    setDestination(tempName);
+    setDestCoords(tempCoords);
+  };
+
+  const handlePresetSelect = (pOrigin: string, pDest: string) => {
+    const origC = safeRouteEngine.resolveCoordinates(pOrigin);
+    const destC = safeRouteEngine.resolveCoordinates(pDest);
+    setOrigin(pOrigin);
+    setDestination(pDest);
+    setOriginCoords(origC);
+    setDestCoords(destC);
+    if (onSelectCoordinates) {
+      onSelectCoordinates(origC.lat, origC.lon, pOrigin);
     }
   };
 
@@ -231,9 +335,14 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
     }
   };
 
+  const activeRoute =
+    analysisResult && selectedRouteType === 'safe'
+      ? analysisResult.recommendedRoute
+      : analysisResult?.alternateRoutes[0] || analysisResult?.recommendedRoute;
+
   return (
     <div className="min-h-screen w-full bg-[#050B14] text-slate-100 flex flex-col justify-between selection:bg-emerald-600 selection:text-white relative overflow-x-hidden font-sans">
-      {/* Dynamic Background */}
+      {/* Background Gradient */}
       <div className="fixed inset-0 bg-gradient-to-b from-[#050B14] via-[#091220] to-[#040812] pointer-events-none z-0" />
 
       {/* Main Container - Centered Mobile Layout */}
@@ -242,7 +351,7 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
         {/* 1. TOP HEADER BAR matching Image 2 */}
         {/* ========================================================================= */}
         <header className="px-4 pt-3 pb-2 flex items-center justify-between border-b border-slate-800/60 bg-[#070E1A]/95 backdrop-blur-md sticky top-0 z-40">
-          {/* Left: Hamburger Menu & Brand Shield */}
+          {/* Left: Menu & Brand Shield */}
           <div className="flex items-center gap-3">
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
@@ -272,7 +381,7 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
             </div>
           </div>
 
-          {/* Right: Theme Toggle & Notification Bell with (1) Badge */}
+          {/* Right: Theme Toggle & Alerts Bell */}
           <div className="flex items-center gap-2">
             <button
               onClick={toggleTheme}
@@ -289,7 +398,7 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
             >
               <Bell className="w-4 h-4 text-slate-200" />
               <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-rose-500 text-[10px] font-bold text-white flex items-center justify-center animate-pulse">
-                1
+                {analysisResult?.detectedHazards.length || 1}
               </span>
             </button>
           </div>
@@ -310,9 +419,11 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
                 Logout
               </button>
             </div>
-            {/* Corridor Quick Presets */}
-            <div className="space-y-1">
-              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Quick Corridors</span>
+            {/* Quick Corridors Selection */}
+            <div className="space-y-1.5">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                Popular Disaster &amp; Highway Corridors
+              </span>
               <div className="grid grid-cols-2 gap-1.5">
                 <button
                   onClick={() => { handlePresetSelect('Pune', 'Talegaon'); setIsMenuOpen(false); }}
@@ -326,30 +437,43 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
                 >
                   Shimla ⇄ Manali (NH 5)
                 </button>
+                <button
+                  onClick={() => { handlePresetSelect('Mumbai', 'Pune'); setIsMenuOpen(false); }}
+                  className="px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-200 hover:text-emerald-300 text-xs text-left truncate"
+                >
+                  Mumbai ⇄ Pune (Expressway)
+                </button>
+                <button
+                  onClick={() => { handlePresetSelect('Dehradun', 'Mussoorie'); setIsMenuOpen(false); }}
+                  className="px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-200 hover:text-emerald-300 text-xs text-left truncate"
+                >
+                  Dehradun ⇄ Mussoorie
+                </button>
               </div>
             </div>
           </div>
         )}
 
         {/* ========================================================================= */}
-        {/* 2. ROUTE SEARCH & ORIGIN / DESTINATION BOX matching Image 2 */}
+        {/* 2. ROUTE SEARCH & LIVE AUTOCOMPLETE INPUTS */}
         {/* ========================================================================= */}
-        <section className="px-4 py-3 bg-[#0A1220] border-b border-slate-800/80">
+        <section className="px-4 py-3 bg-[#0A1220] border-b border-slate-800/80 relative">
           <div className="flex items-center justify-between gap-3">
-            {/* Origin & Destination Inputs */}
-            <div className="flex-1 space-y-2">
-              {/* Origin */}
-              <div className="flex items-center gap-2.5">
+            {/* Inputs Column */}
+            <div className="flex-1 space-y-2 relative">
+              {/* Origin Search */}
+              <div className="relative flex items-center gap-2.5">
                 <div className="w-3 h-3 rounded-full bg-blue-500 ring-4 ring-blue-500/20 shrink-0" />
                 <div className="flex-1">
                   <input
                     type="text"
                     value={origin}
-                    onChange={(e) => setOrigin(e.target.value)}
+                    onChange={(e) => handleOriginChange(e.target.value)}
+                    onFocus={() => setActiveInput('origin')}
                     className="w-full bg-transparent font-bold text-sm text-white focus:outline-none placeholder:text-slate-500"
-                    placeholder="Enter starting location"
+                    placeholder="Enter starting location in India"
                   />
-                  <div className="text-[10px] text-blue-400 font-medium">Current Location</div>
+                  <div className="text-[10px] text-blue-400 font-medium">Pickup Point</div>
                 </div>
                 {origin && (
                   <button onClick={() => setOrigin('')} className="p-1 text-slate-500 hover:text-slate-300">
@@ -358,23 +482,43 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
                 )}
               </div>
 
+              {/* Origin Autocomplete Dropdown */}
+              {activeInput === 'origin' && originSuggestions.length > 0 && (
+                <div className="absolute top-10 left-0 right-0 z-50 rounded-2xl bg-slate-900 border border-slate-700 shadow-2xl p-1.5 space-y-1">
+                  {originSuggestions.map((sug, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => selectOriginSuggestion(sug)}
+                      className="w-full text-left px-3 py-2 rounded-xl text-xs hover:bg-slate-800 text-slate-200 flex items-center justify-between"
+                    >
+                      <div className="truncate">
+                        <span className="font-bold text-white">{sug.shortName}</span>
+                        <span className="block text-[10px] text-slate-400 truncate">{sug.displayName}</span>
+                      </div>
+                      <MapPin className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                    </button>
+                  ))}
+                </div>
+              )}
+
               {/* Dotted Connection Line */}
               <div className="pl-1.5 -my-1">
                 <div className="w-0.5 h-3 border-l-2 border-dotted border-slate-600" />
               </div>
 
-              {/* Destination */}
-              <div className="flex items-center gap-2.5">
+              {/* Destination Search */}
+              <div className="relative flex items-center gap-2.5">
                 <div className="w-3 h-3 rounded-sm bg-rose-500 ring-4 ring-rose-500/20 shrink-0" />
                 <div className="flex-1">
                   <input
                     type="text"
                     value={destination}
-                    onChange={(e) => setDestination(e.target.value)}
+                    onChange={(e) => handleDestChange(e.target.value)}
+                    onFocus={() => setActiveInput('dest')}
                     className="w-full bg-transparent font-bold text-sm text-white focus:outline-none placeholder:text-slate-500"
                     placeholder="Enter destination"
                   />
-                  <div className="text-[10px] text-rose-400 font-medium">Destination</div>
+                  <div className="text-[10px] text-rose-400 font-medium">Dropoff Destination</div>
                 </div>
                 {destination && (
                   <button onClick={() => setDestination('')} className="p-1 text-slate-500 hover:text-slate-300">
@@ -382,13 +526,32 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
                   </button>
                 )}
               </div>
+
+              {/* Destination Autocomplete Dropdown */}
+              {activeInput === 'dest' && destSuggestions.length > 0 && (
+                <div className="absolute top-20 left-0 right-0 z-50 rounded-2xl bg-slate-900 border border-slate-700 shadow-2xl p-1.5 space-y-1">
+                  {destSuggestions.map((sug, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => selectDestSuggestion(sug)}
+                      className="w-full text-left px-3 py-2 rounded-xl text-xs hover:bg-slate-800 text-slate-200 flex items-center justify-between"
+                    >
+                      <div className="truncate">
+                        <span className="font-bold text-white">{sug.shortName}</span>
+                        <span className="block text-[10px] text-slate-400 truncate">{sug.displayName}</span>
+                      </div>
+                      <MapPin className="w-3.5 h-3.5 text-rose-400 shrink-0" />
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Swap Button on Right */}
             <button
               onClick={handleSwap}
               className="p-3 rounded-2xl bg-slate-900/90 hover:bg-slate-800 border border-slate-800 flex flex-col items-center justify-center gap-1 text-emerald-400 shadow-md active:scale-95 transition-all shrink-0"
-              title="Swap Locations"
+              title="Swap Origin and Destination"
             >
               <ArrowUpDown className="w-4 h-4 text-emerald-400" />
               <span className="text-[10px] font-bold text-emerald-400">Swap</span>
@@ -397,63 +560,63 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
         </section>
 
         {/* ========================================================================= */}
-        {/* 3. VEHICLE MODE SELECTORS matching Image 2 */}
+        {/* 3. VEHICLE MODE SELECTORS */}
         {/* ========================================================================= */}
-        <section className="px-4 py-2.5 bg-[#070E1A] border-b border-slate-800/80">
+        <section className="px-4 py-2 bg-[#070E1A] border-b border-slate-800/80">
           <div className="grid grid-cols-4 gap-2">
             {/* Car */}
             <button
               onClick={() => setSelectedVehicle('car')}
-              className={`py-2.5 px-2 rounded-2xl border flex flex-col items-center justify-center gap-1 transition-all ${
+              className={`py-2 px-2 rounded-2xl border flex flex-col items-center justify-center gap-0.5 transition-all ${
                 selectedVehicle === 'car'
                   ? 'bg-emerald-950/40 border-emerald-500 ring-1 ring-emerald-500/50 text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.2)]'
                   : 'bg-slate-900/70 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800/80'
               }`}
             >
-              <Car className="w-5 h-5" />
-              <span className="text-[11px] font-bold">Car</span>
+              <Car className="w-4 h-4" />
+              <span className="text-[10px] font-bold">Car</span>
             </button>
 
             {/* Bike */}
             <button
               onClick={() => setSelectedVehicle('bike')}
-              className={`py-2.5 px-2 rounded-2xl border flex flex-col items-center justify-center gap-1 transition-all ${
+              className={`py-2 px-2 rounded-2xl border flex flex-col items-center justify-center gap-0.5 transition-all ${
                 selectedVehicle === 'bike'
                   ? 'bg-emerald-950/40 border-emerald-500 ring-1 ring-emerald-500/50 text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.2)]'
                   : 'bg-slate-900/70 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800/80'
               }`}
             >
-              <Bike className="w-5 h-5" />
-              <span className="text-[11px] font-bold">Bike</span>
+              <Bike className="w-4 h-4" />
+              <span className="text-[10px] font-bold">Bike</span>
             </button>
 
-            {/* Truck (Selected Active in Screenshot) */}
+            {/* Truck */}
             <button
               onClick={() => setSelectedVehicle('truck')}
-              className={`py-2.5 px-2 rounded-2xl border flex flex-col items-center justify-center gap-1 transition-all ${
+              className={`py-2 px-2 rounded-2xl border flex flex-col items-center justify-center gap-0.5 transition-all ${
                 selectedVehicle === 'truck'
                   ? 'bg-emerald-950/40 border-emerald-500 ring-1 ring-emerald-500/50 text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.25)]'
                   : 'bg-slate-900/70 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800/80'
               }`}
             >
-              <Truck className="w-5 h-5 text-emerald-400" />
-              <span className="text-[11px] font-bold text-emerald-400">Truck</span>
+              <Truck className="w-4 h-4 text-emerald-400" />
+              <span className="text-[10px] font-bold text-emerald-400">Truck</span>
             </button>
 
             {/* Ambulance */}
             <button
               onClick={() => setSelectedVehicle('ambulance')}
-              className={`py-2.5 px-2 rounded-2xl border flex flex-col items-center justify-center gap-1 transition-all ${
+              className={`py-2 px-2 rounded-2xl border flex flex-col items-center justify-center gap-0.5 transition-all ${
                 selectedVehicle === 'ambulance'
                   ? 'bg-emerald-950/40 border-emerald-500 ring-1 ring-emerald-500/50 text-emerald-300 shadow-[0_0_15px_rgba(16,185,129,0.2)]'
                   : 'bg-slate-900/70 border-slate-800 text-slate-400 hover:text-slate-200 hover:bg-slate-800/80'
               }`}
             >
               <div className="relative">
-                <Truck className="w-5 h-5" />
-                <span className="absolute -top-1 -right-1 text-[9px] text-rose-400 font-extrabold">+</span>
+                <Truck className="w-4 h-4" />
+                <span className="absolute -top-1 -right-1 text-[8px] text-rose-400 font-extrabold">+</span>
               </div>
-              <span className="text-[11px] font-bold">Ambulance</span>
+              <span className="text-[10px] font-bold">Ambulance</span>
             </button>
           </div>
         </section>
@@ -461,32 +624,61 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
         {/* ========================================================================= */}
         {/* 4. REAL INTERACTIVE LEAFLET ROAD MAP SECTION */}
         {/* ========================================================================= */}
-        <section className="relative flex-1 min-h-[350px] sm:min-h-[420px] bg-[#0A1322] overflow-hidden flex flex-col justify-between p-3">
-          {/* Leaflet Map Canvas Container */}
+        <section className="relative flex-1 min-h-[350px] sm:min-h-[400px] bg-[#0A1322] overflow-hidden flex flex-col justify-between p-3">
+          {/* Leaflet Map Canvas */}
           <div
             ref={navMapContainerRef}
             className="absolute inset-0 w-full h-full z-0"
             id="bharat-netra-nav-leaflet-map"
           />
 
-          {/* Top Left: Live Traffic Indicator floating over real map */}
-          <div className="relative z-20 self-start pointer-events-none">
+          {/* Top Controls Overlay on Map */}
+          <div className="relative z-20 flex items-center justify-between w-full pointer-events-none">
+            {/* Live Traffic Badge */}
             <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-[#07111E]/90 border border-slate-700/80 text-[11px] font-bold text-slate-200 backdrop-blur-md shadow-lg pointer-events-auto">
               <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-              <span>Live Traffic</span>
+              <span>{isCalculatingRoute ? 'Calculating Live Route...' : 'Live Safe Traffic'}</span>
             </div>
+
+            {/* Route Option Switcher (Safe vs Alternate Direct) */}
+            {analysisResult && analysisResult.alternateRoutes.length > 0 && (
+              <div className="flex items-center gap-1 bg-[#091322]/90 border border-slate-700/80 p-0.5 rounded-xl backdrop-blur-md pointer-events-auto shadow-lg">
+                <button
+                  onClick={() => setSelectedRouteType('safe')}
+                  className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all ${
+                    selectedRouteType === 'safe'
+                      ? 'bg-emerald-500 text-white shadow'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Safe Route
+                </button>
+                <button
+                  onClick={() => setSelectedRouteType('alternate')}
+                  className={`px-2 py-1 rounded-lg text-[10px] font-bold transition-all ${
+                    selectedRouteType === 'alternate'
+                      ? 'bg-amber-500 text-white shadow'
+                      : 'text-slate-400 hover:text-white'
+                  }`}
+                >
+                  Shortcut
+                </button>
+              </div>
+            )}
           </div>
 
-          {/* Floating Route Info Badge on Map matching Image 2 */}
-          <div className="absolute top-[48%] left-[22%] z-20 flex flex-col items-start gap-1 pointer-events-auto">
-            <div className="px-2.5 py-1.5 rounded-xl bg-emerald-950/90 border border-emerald-500/80 text-emerald-300 font-extrabold text-xs shadow-lg backdrop-blur-md flex flex-col leading-tight">
-              <span>{activeRoute.durationMin} min</span>
-              <span className="text-[10px] font-normal text-emerald-400/90">{activeRoute.distanceKm} km</span>
+          {/* Floating Route Info Badge on Map */}
+          {activeRoute && (
+            <div className="absolute top-[44%] left-[16%] z-20 flex flex-col items-start gap-1 pointer-events-auto">
+              <div className="px-2.5 py-1.5 rounded-xl bg-emerald-950/90 border border-emerald-500/80 text-emerald-300 font-extrabold text-xs shadow-lg backdrop-blur-md flex flex-col leading-tight">
+                <span>{activeRoute.durationMin} min</span>
+                <span className="text-[10px] font-normal text-emerald-400/90">{activeRoute.distanceKm} km</span>
+              </div>
+              <div className="px-1.5 py-0.5 rounded bg-slate-900/90 border border-emerald-500/40 text-[9px] font-bold text-emerald-400">
+                {activeRoute.highway}
+              </div>
             </div>
-            <div className="px-1.5 py-0.5 rounded bg-slate-900/90 border border-emerald-500/40 text-[9px] font-bold text-emerald-400">
-              {activeRoute.highway}
-            </div>
-          </div>
+          )}
 
           {/* Right Floating Working Map Controls */}
           <div className="relative z-20 self-end flex flex-col gap-2 pointer-events-auto">
@@ -506,7 +698,7 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
             </button>
             <button
               onClick={() => {
-                if (navMapRef.current) {
+                if (navMapRef.current && analysisResult) {
                   navMapRef.current.flyTo(
                     [analysisResult.originCoords.lat, analysisResult.originCoords.lon],
                     13,
@@ -523,40 +715,55 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
         </section>
 
         {/* ========================================================================= */}
-        {/* 5. SAFE ROUTE BOTTOM CARD & TELEMETRY matching Image 2 */}
+        {/* 5. SAFE ROUTE BOTTOM CARD & TELEMETRY */}
         {/* ========================================================================= */}
-        <section className="px-4 py-3 bg-[#08101C] border-t border-slate-800/80 space-y-3">
+        <section className="px-4 py-3 bg-[#08101C] border-t border-slate-800/80 space-y-2.5">
           {/* Main Action Banner: Safe Route & START Button */}
-          <div className="flex items-center justify-between gap-3 bg-[#0C1728] p-3.5 rounded-3xl border border-slate-800 shadow-xl">
+          <div className="flex items-center justify-between gap-3 bg-[#0C1728] p-3 rounded-3xl border border-slate-800 shadow-xl">
             {/* Left: Shield & Route Stats */}
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-3 min-w-0">
               <div className="w-11 h-11 rounded-2xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0">
                 <Shield className="w-6 h-6 fill-emerald-500/20 stroke-emerald-400" />
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-sm text-white">Safe Route</span>
-                  <span className="px-1.5 py-0.2 rounded text-[10px] font-extrabold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                    {activeRoute.safetyGainPercent}% Safer
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <span className="font-bold text-sm text-white truncate">
+                    {selectedRouteType === 'safe' ? 'Safe Route' : 'Direct Shortcut'}
                   </span>
+                  {activeRoute && activeRoute.safetyGainPercent > 0 && (
+                    <span className="px-1.5 py-0.2 rounded text-[10px] font-extrabold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
+                      +{activeRoute.safetyGainPercent}% Safer
+                    </span>
+                  )}
                 </div>
                 <div className="text-base font-black text-white font-mono mt-0.5">
-                  {activeRoute.durationMin} min <span className="text-xs text-slate-400 font-normal">• {activeRoute.distanceKm} km</span>
+                  {activeRoute?.durationMin || 35} min{' '}
+                  <span className="text-xs text-slate-400 font-normal">
+                    • {activeRoute?.distanceKm || 35.1} km
+                  </span>
                 </div>
               </div>
             </div>
 
-            {/* Right: Big Green START Button matching Image 2 */}
+            {/* Right: Big Green START Button */}
             <button
               onClick={() => setIsJourneyStarted(!isJourneyStarted)}
-              className="px-6 py-3 rounded-2xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white font-black text-sm tracking-wide shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 active:scale-95 transition-all text-center flex flex-col items-center justify-center leading-tight"
+              className="px-5 py-2.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white font-black text-xs tracking-wide shadow-lg shadow-emerald-500/30 hover:shadow-emerald-500/50 active:scale-95 transition-all text-center flex flex-col items-center justify-center leading-tight shrink-0"
             >
               <span>{isJourneyStarted ? 'PAUSE' : 'START'}</span>
-              <span className="text-[9px] font-normal text-emerald-100">Let's drive safely</span>
+              <span className="text-[8px] font-normal text-emerald-100">Live Guidance</span>
             </button>
           </div>
 
-          {/* 3 Telemetry Summary Badges matching Image 2 */}
+          {/* Vehicle Constraint Notice if applicable */}
+          {activeRoute?.vehicleConstraints.notice && (
+            <div className="px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-[10px] text-slate-300 flex items-center gap-1.5">
+              <Info className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+              <span className="truncate">{activeRoute.vehicleConstraints.notice}</span>
+            </div>
+          )}
+
+          {/* 3 Telemetry Summary Badges */}
           <div className="grid grid-cols-3 gap-2 text-left">
             {/* Hazards Monitored */}
             <div
@@ -564,19 +771,21 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
               className="cursor-pointer bg-[#0A1424] hover:bg-[#0D1A30] p-2 rounded-2xl border border-slate-800/80 space-y-1 transition-all"
             >
               <div className="flex items-center gap-1.5 text-emerald-400">
-                <ShieldAlert className="w-3.5 h-3.5" />
+                <ShieldAlert className="w-3.5 h-3.5 shrink-0" />
                 <span className="text-[10px] font-bold text-slate-200">Hazards Monitored</span>
               </div>
-              <div className="text-[9px] text-slate-400 leading-tight">
-                {activeRoute.hazardsAvoided.length > 0 ? activeRoute.hazardsAvoided[0] : 'Landslide, Flood, Rain'}
+              <div className="text-[9px] text-slate-400 leading-tight truncate">
+                {activeRoute && activeRoute.hazardsAvoided.length > 0
+                  ? activeRoute.hazardsAvoided[0]
+                  : 'Landslide, Flood, Rain'}
               </div>
             </div>
 
             {/* Traffic Updates Live */}
             <div className="bg-[#0A1424] p-2 rounded-2xl border border-slate-800/80 space-y-1">
               <div className="flex items-center gap-1.5 text-blue-400">
-                <Radio className="w-3.5 h-3.5" />
-                <span className="text-[10px] font-bold text-slate-200">Traffic Updates Live</span>
+                <Radio className="w-3.5 h-3.5 shrink-0" />
+                <span className="text-[10px] font-bold text-slate-200">Traffic Updates</span>
               </div>
               <div className="text-[9px] text-slate-400 leading-tight">
                 Real-time routing
@@ -589,11 +798,15 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
               className="cursor-pointer bg-[#0A1424] hover:bg-[#0D1A30] p-2 rounded-2xl border border-slate-800/80 space-y-1 transition-all group"
             >
               <div className="flex items-center gap-1.5 text-cyan-400">
-                <CloudRain className="w-3.5 h-3.5 text-cyan-400 group-hover:animate-bounce" />
+                <CloudRain className="w-3.5 h-3.5 text-cyan-400 group-hover:animate-bounce shrink-0" />
                 <span className="text-[10px] font-bold text-slate-200">Weather Safe</span>
               </div>
-              <div className="text-[9px] text-cyan-300/90 leading-tight">
-                {weatherData ? `${weatherData.current.weather_description || 'Clear'} • ${Math.round(weatherData.current.temperature)}°C` : 'Light rain • 24°C'}
+              <div className="text-[9px] text-cyan-300/90 leading-tight truncate">
+                {weatherData
+                  ? `${weatherData.current.weather_description || 'Clear'} • ${Math.round(
+                      weatherData.current.temperature
+                    )}°C`
+                  : 'Light rain • 24°C'}
               </div>
             </div>
           </div>
@@ -642,7 +855,7 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
               <span className="text-[10px] font-bold text-emerald-400 mt-1">Start Journey</span>
             </div>
 
-            {/* Alerts with Badge 1 */}
+            {/* Alerts with Badge */}
             <button
               onClick={() => handleBottomTabClick('alerts')}
               className={`flex flex-col items-center gap-1 py-1 px-3 relative transition-colors ${
@@ -652,7 +865,7 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
               <div className="relative">
                 <Bell className="w-5 h-5" />
                 <span className="absolute -top-1 -right-1 w-3.5 h-3.5 rounded-full bg-rose-500 text-[9px] font-bold text-white flex items-center justify-center">
-                  1
+                  {analysisResult?.detectedHazards.length || 1}
                 </span>
               </div>
               <span className="text-[10px] font-medium">Alerts</span>
@@ -672,7 +885,7 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
         </nav>
       </div>
 
-      {/* Alert Modal */}
+      {/* Active Road Hazard Advisory Modal */}
       {showAlertModal && (
         <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="w-full max-w-sm rounded-3xl bg-slate-900 border border-slate-800 p-5 space-y-4 shadow-2xl">
@@ -685,13 +898,16 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <div className="p-3 rounded-2xl bg-slate-950 border border-amber-500/30 space-y-1.5">
-              <div className="text-xs font-bold text-white">{activeRoute.highway} Safe Route Active</div>
-              <div className="text-[11px] text-slate-300">
-                {activeRoute.hazardsAvoided.length > 0
-                  ? `Safely bypassing: ${activeRoute.hazardsAvoided.join(', ')}`
-                  : 'Monsoon caution. All sensors normal along recommended route.'}
+            <div className="p-3 rounded-2xl bg-slate-950 border border-amber-500/30 space-y-2">
+              <div className="text-xs font-bold text-white">
+                {activeRoute?.highway || 'Highway'} Corridor Status
               </div>
+              {analysisResult?.detectedHazards.map((hz, i) => (
+                <div key={i} className="text-[11px] text-slate-300 flex items-start gap-1.5">
+                  <span className="text-rose-400">⚠️</span>
+                  <span>{hz.description}</span>
+                </div>
+              ))}
             </div>
             <button
               onClick={() => { setShowAlertModal(false); onOpenWeatherPrediction(); }}
