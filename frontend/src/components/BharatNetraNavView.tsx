@@ -21,11 +21,13 @@ import {
   X,
   CloudRain,
   Radio,
-  CheckCircle2,
-  Sparkles
+  Sparkles,
+  Zap,
+  Info
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { WeatherForecastResponse, LandslidePredictionResponse } from '../types';
+import { safeRouteEngine, VehicleType } from '../services/safeRouteEngine';
 
 interface BharatNetraNavViewProps {
   user: { name: string; role: string; emailOrPhone: string } | null;
@@ -36,63 +38,7 @@ interface BharatNetraNavViewProps {
   onSelectCoordinates?: (lat: number, lon: number, name: string) => void;
 }
 
-type VehicleType = 'car' | 'bike' | 'truck' | 'ambulance';
 type BottomTab = 'trips' | 'nearby' | 'start' | 'alerts' | 'road_info';
-
-const ROUTE_PRESETS = [
-  {
-    from: 'Pune',
-    to: 'Talegaon',
-    distance: '35.1 km',
-    duration: '35 min',
-    highway: 'NH 48',
-    safetyBoost: '10% Safer',
-    fromCoords: [18.5204, 73.8567] as [number, number],
-    toCoords: [18.7297, 73.6749] as [number, number],
-    routePath: [
-      [18.5204, 73.8567],
-      [18.5350, 73.8300],
-      [18.5700, 73.7900],
-      [18.6100, 73.7600],
-      [18.6600, 73.7200],
-      [18.7000, 73.6900],
-      [18.7297, 73.6749]
-    ] as [number, number][]
-  },
-  {
-    from: 'Shimla',
-    to: 'Kufri / Manali',
-    distance: '48.2 km',
-    duration: '1 hr 20 min',
-    highway: 'NH 5',
-    safetyBoost: '18% Safer',
-    fromCoords: [31.1048, 77.1734] as [number, number],
-    toCoords: [31.0979, 77.2678] as [number, number],
-    routePath: [
-      [31.1048, 77.1734],
-      [31.1080, 77.2000],
-      [31.1150, 77.2300],
-      [31.0979, 77.2678]
-    ] as [number, number][]
-  },
-  {
-    from: 'Mumbai',
-    to: 'Pune Expressway',
-    distance: '148 km',
-    duration: '2 hr 45 min',
-    highway: 'Expressway',
-    safetyBoost: '14% Safer',
-    fromCoords: [19.0760, 72.8777] as [number, number],
-    toCoords: [18.5204, 73.8567] as [number, number],
-    routePath: [
-      [19.0760, 72.8777],
-      [19.0330, 73.0297],
-      [18.9894, 73.1175],
-      [18.7557, 73.4091],
-      [18.5204, 73.8567]
-    ] as [number, number][]
-  }
-];
 
 export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
   user,
@@ -106,14 +52,20 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
   const [selectedVehicle, setSelectedVehicle] = useState<VehicleType>('truck');
   const [activeBottomTab, setActiveBottomTab] = useState<BottomTab>('start');
 
-  const [currentRouteIndex, setCurrentRouteIndex] = useState(0);
-  const route = ROUTE_PRESETS[currentRouteIndex];
-
-  const [origin, setOrigin] = useState(route.from);
-  const [destination, setDestination] = useState(route.to);
+  const [origin, setOrigin] = useState('Pune');
+  const [destination, setDestination] = useState('Talegaon');
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [showAlertModal, setShowAlertModal] = useState(false);
   const [isJourneyStarted, setIsJourneyStarted] = useState(false);
+
+  // Compute Safe Route with Integrated SafeRouteEngine (from Bharat-Netra repo)
+  const analysisResult = safeRouteEngine.analyzeRoute(
+    origin,
+    destination,
+    selectedVehicle,
+    predictionData?.risk_level
+  );
+  const activeRoute = analysisResult.recommendedRoute;
 
   // Leaflet Map Refs
   const navMapContainerRef = useRef<HTMLDivElement>(null);
@@ -124,7 +76,6 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
   useEffect(() => {
     if (!navMapContainerRef.current || navMapRef.current) return;
 
-    // Center on mid-point between Pune and Talegaon
     const map = L.map(navMapContainerRef.current, {
       center: [18.625, 73.765],
       zoom: 11,
@@ -133,7 +84,7 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
       maxZoom: 19
     });
 
-    // Dark Satellite / CartoDB Hybrid Tiles (No API key needed, zero watermark, 100% reliable)
+    // Dark Satellite / CartoDB Hybrid Tiles (Zero watermark, no invalid API key)
     L.tileLayer('https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}', {
       subdomains: ['mt0', 'mt1', 'mt2', 'mt3'],
       maxZoom: 20
@@ -152,15 +103,15 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
     };
   }, []);
 
-  // Update Route Polyline & Markers on Map
+  // Update Route Polyline & Markers on Map dynamically whenever route changes
   useEffect(() => {
     if (!navMapRef.current || !routeLayerGroupRef.current) return;
 
     const layerGroup = routeLayerGroupRef.current;
     layerGroup.clearLayers();
 
-    // 1. Draw glowing green route polyline matching Image 2
-    const glowPolyline = L.polyline(route.routePath, {
+    // 1. Draw glowing green safe route polyline
+    const glowPolyline = L.polyline(activeRoute.path, {
       color: '#10b981',
       weight: 6,
       opacity: 0.9,
@@ -168,7 +119,7 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
       lineJoin: 'round'
     });
 
-    const innerPolyline = L.polyline(route.routePath, {
+    const innerPolyline = L.polyline(activeRoute.path, {
       color: '#ffffff',
       weight: 2,
       opacity: 0.7,
@@ -178,7 +129,31 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
     layerGroup.addLayer(glowPolyline);
     layerGroup.addLayer(innerPolyline);
 
-    // 2. Origin Marker (Blue pulsing circle)
+    // 2. Draw hazard avoidance markers from analysisResult
+    analysisResult.detectedHazards.forEach((hazard) => {
+      const hazardCircle = L.circleMarker([hazard.location.lat, hazard.location.lon], {
+        radius: 14,
+        fillColor: '#ef4444',
+        color: '#facc15',
+        weight: 2,
+        opacity: 0.9,
+        fillOpacity: 0.75
+      });
+      hazardCircle.bindTooltip(
+        `<div style="font-family: Inter, sans-serif; font-size: 11px;">
+          <strong style="color: #ef4444;">⚠️ AVOIDED HAZARD</strong><br/>
+          ${hazard.description}
+        </div>`,
+        { direction: 'top', offset: [0, -10] }
+      );
+      layerGroup.addLayer(hazardCircle);
+    });
+
+    // 3. Origin Marker (Blue pulsing circle)
+    const originCoords: [number, number] = [
+      analysisResult.originCoords.lat,
+      analysisResult.originCoords.lon
+    ];
     const originIcon = L.divIcon({
       className: 'nav-origin-marker',
       html: `
@@ -195,10 +170,14 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
       iconAnchor: [15, 11]
     });
 
-    const originMarker = L.marker(route.fromCoords, { icon: originIcon });
+    const originMarker = L.marker(originCoords, { icon: originIcon });
     layerGroup.addLayer(originMarker);
 
-    // 3. Destination Marker (Red circle)
+    // 4. Destination Marker (Red square)
+    const destCoords: [number, number] = [
+      analysisResult.destCoords.lat,
+      analysisResult.destCoords.lon
+    ];
     const destIcon = L.divIcon({
       className: 'nav-dest-marker',
       html: `
@@ -215,26 +194,32 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
       iconAnchor: [15, 11]
     });
 
-    const destMarker = L.marker(route.toCoords, { icon: destIcon });
+    const destMarker = L.marker(destCoords, { icon: destIcon });
     layerGroup.addLayer(destMarker);
 
     // Fit map bounds to show full route nicely
     navMapRef.current.fitBounds(glowPolyline.getBounds(), {
-      padding: [40, 40],
+      padding: [45, 45],
       maxZoom: 13
     });
-  }, [route, origin, destination]);
-
-  // Sync origin/dest when preset changes
-  useEffect(() => {
-    setOrigin(route.from);
-    setDestination(route.to);
-  }, [currentRouteIndex]);
+  }, [activeRoute, origin, destination, analysisResult]);
 
   const handleSwap = () => {
     const temp = origin;
     setOrigin(destination);
     setDestination(temp);
+  };
+
+  const handlePresetSelect = (presetOrigin: string, presetDest: string) => {
+    setOrigin(presetOrigin);
+    setDestination(presetDest);
+    if (onSelectCoordinates) {
+      if (presetOrigin.toLowerCase().includes('shimla')) {
+        onSelectCoordinates(31.1048, 77.1734, 'Shimla, Himachal Pradesh');
+      } else {
+        onSelectCoordinates(18.5204, 73.8567, 'Pune, Maharashtra');
+      }
+    }
   };
 
   const handleBottomTabClick = (tab: BottomTab) => {
@@ -325,14 +310,23 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
                 Logout
               </button>
             </div>
-            <div className="text-xs text-slate-400 space-y-1.5">
-              <button
-                onClick={onOpenWeatherPrediction}
-                className="w-full text-left py-1.5 px-2 rounded-lg bg-blue-600/20 text-cyan-300 font-semibold flex items-center justify-between"
-              >
-                <span>Open Weather &amp; Landslide Forecast</span>
-                <Sparkles className="w-3.5 h-3.5" />
-              </button>
+            {/* Corridor Quick Presets */}
+            <div className="space-y-1">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Quick Corridors</span>
+              <div className="grid grid-cols-2 gap-1.5">
+                <button
+                  onClick={() => { handlePresetSelect('Pune', 'Talegaon'); setIsMenuOpen(false); }}
+                  className="px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-200 hover:text-emerald-300 text-xs text-left truncate"
+                >
+                  Pune ⇄ Talegaon (NH 48)
+                </button>
+                <button
+                  onClick={() => { handlePresetSelect('Shimla', 'Manali'); setIsMenuOpen(false); }}
+                  className="px-2.5 py-1.5 rounded-lg bg-slate-800 text-slate-200 hover:text-emerald-300 text-xs text-left truncate"
+                >
+                  Shimla ⇄ Manali (NH 5)
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -465,7 +459,7 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
         </section>
 
         {/* ========================================================================= */}
-        {/* 4. REAL INTERACTIVE LEAFLET ROAD MAP SECTION (Replaces Broken MapTiler) */}
+        {/* 4. REAL INTERACTIVE LEAFLET ROAD MAP SECTION */}
         {/* ========================================================================= */}
         <section className="relative flex-1 min-h-[350px] sm:min-h-[420px] bg-[#0A1322] overflow-hidden flex flex-col justify-between p-3">
           {/* Leaflet Map Canvas Container */}
@@ -486,11 +480,11 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
           {/* Floating Route Info Badge on Map matching Image 2 */}
           <div className="absolute top-[48%] left-[22%] z-20 flex flex-col items-start gap-1 pointer-events-auto">
             <div className="px-2.5 py-1.5 rounded-xl bg-emerald-950/90 border border-emerald-500/80 text-emerald-300 font-extrabold text-xs shadow-lg backdrop-blur-md flex flex-col leading-tight">
-              <span>{route.duration}</span>
-              <span className="text-[10px] font-normal text-emerald-400/90">{route.distance}</span>
+              <span>{activeRoute.durationMin} min</span>
+              <span className="text-[10px] font-normal text-emerald-400/90">{activeRoute.distanceKm} km</span>
             </div>
             <div className="px-1.5 py-0.5 rounded bg-slate-900/90 border border-emerald-500/40 text-[9px] font-bold text-emerald-400">
-              {route.highway}
+              {activeRoute.highway}
             </div>
           </div>
 
@@ -513,11 +507,15 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
             <button
               onClick={() => {
                 if (navMapRef.current) {
-                  navMapRef.current.flyTo(route.fromCoords, 13, { duration: 1 });
+                  navMapRef.current.flyTo(
+                    [analysisResult.originCoords.lat, analysisResult.originCoords.lon],
+                    13,
+                    { duration: 1 }
+                  );
                 }
               }}
               className="w-10 h-10 rounded-2xl bg-[#091322]/90 hover:bg-slate-800 border border-slate-700/80 flex items-center justify-center text-emerald-400 shadow-xl backdrop-blur-md active:scale-95"
-              title="Recenter Map on Current Location"
+              title="Recenter Map on Origin"
             >
               <Crosshair className="w-5 h-5" />
             </button>
@@ -539,11 +537,11 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
                 <div className="flex items-center gap-2">
                   <span className="font-bold text-sm text-white">Safe Route</span>
                   <span className="px-1.5 py-0.2 rounded text-[10px] font-extrabold bg-emerald-500/20 text-emerald-400 border border-emerald-500/30">
-                    {route.safetyBoost}
+                    {activeRoute.safetyGainPercent}% Safer
                   </span>
                 </div>
                 <div className="text-base font-black text-white font-mono mt-0.5">
-                  {route.duration} <span className="text-xs text-slate-400 font-normal">• {route.distance}</span>
+                  {activeRoute.durationMin} min <span className="text-xs text-slate-400 font-normal">• {activeRoute.distanceKm} km</span>
                 </div>
               </div>
             </div>
@@ -570,7 +568,7 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
                 <span className="text-[10px] font-bold text-slate-200">Hazards Monitored</span>
               </div>
               <div className="text-[9px] text-slate-400 leading-tight">
-                Landslide, Flood, Rain
+                {activeRoute.hazardsAvoided.length > 0 ? activeRoute.hazardsAvoided[0] : 'Landslide, Flood, Rain'}
               </div>
             </div>
 
@@ -581,7 +579,7 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
                 <span className="text-[10px] font-bold text-slate-200">Traffic Updates Live</span>
               </div>
               <div className="text-[9px] text-slate-400 leading-tight">
-                Real-time traffic
+                Real-time routing
               </div>
             </div>
 
@@ -688,9 +686,11 @@ export const BharatNetraNavView: React.FC<BharatNetraNavViewProps> = ({
               </button>
             </div>
             <div className="p-3 rounded-2xl bg-slate-950 border border-amber-500/30 space-y-1.5">
-              <div className="text-xs font-bold text-white">NH 48 Monsoon Caution (Khandala Ghat)</div>
+              <div className="text-xs font-bold text-white">{activeRoute.highway} Safe Route Active</div>
               <div className="text-[11px] text-slate-300">
-                Light rainfall with wet road surfaces. Slope monitoring active for rockfall mitigation.
+                {activeRoute.hazardsAvoided.length > 0
+                  ? `Safely bypassing: ${activeRoute.hazardsAvoided.join(', ')}`
+                  : 'Monsoon caution. All sensors normal along recommended route.'}
               </div>
             </div>
             <button

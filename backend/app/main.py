@@ -29,6 +29,7 @@ from routes.weather import router as weather_router
 from routes.location import router as location_router
 from routes.prediction import router as prediction_router
 from routes.history import router as history_router
+from routes.routing import router as routing_router
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -76,12 +77,14 @@ app.include_router(weather_router, prefix=settings.API_V1_STR)
 app.include_router(location_router, prefix=settings.API_V1_STR)
 app.include_router(prediction_router, prefix=settings.API_V1_STR)
 app.include_router(history_router, prefix=settings.API_V1_STR)
+app.include_router(routing_router, prefix=settings.API_V1_STR)
 
 # Also expose without /api prefix for direct endpoint access
 app.include_router(weather_router)
 app.include_router(location_router)
 app.include_router(prediction_router)
 app.include_router(history_router)
+app.include_router(routing_router)
 
 # Mount frontend assets and SPA routes if built
 if os.path.exists(FRONTEND_DIST) and os.path.exists(os.path.join(FRONTEND_DIST, "index.html")):
