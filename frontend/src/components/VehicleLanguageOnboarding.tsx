@@ -103,20 +103,11 @@ export const VehicleLanguageOnboarding: React.FC<VehicleLanguageOnboardingProps>
           <ChevronLeft className="w-5 h-5 text-slate-200" />
         </button>
 
-        {/* User Verified Status Pill matching Image 2 */}
-        <div className="flex items-center gap-2.5 px-3.5 py-1.5 rounded-full bg-slate-900/90 border border-slate-700/80 backdrop-blur-md shadow-lg">
-          <div className="w-7 h-7 rounded-full bg-amber-700/60 border border-amber-500/80 text-amber-200 font-bold text-xs flex items-center justify-center font-mono">
-            O
-          </div>
-          <div className="text-left">
-            <div className="text-xs font-bold text-white leading-tight">Onkar Pawar</div>
-            <div className="text-[10px] text-cyan-400 font-semibold flex items-center gap-1">
-              <span className="w-2.5 h-2.5 rounded-full bg-cyan-400/20 text-cyan-400 flex items-center justify-center text-[8px]">
-                ✓
-              </span>
-              <span>Verified Driver</span>
-            </div>
-          </div>
+        {/* Official Bharat Netra Brand Header Pill */}
+        <div className="flex items-center gap-2 px-4 py-1.5 rounded-full bg-slate-900/90 border border-slate-700/80 backdrop-blur-md shadow-lg select-none">
+          <div className="w-2 h-2 rounded-full bg-blue-500 animate-pulse" />
+          <span className="text-xs font-black text-white tracking-wider">BHARAT</span>
+          <span className="text-xs font-black text-amber-500">नेत्र</span>
         </div>
 
         {/* Theme Toggle */}
