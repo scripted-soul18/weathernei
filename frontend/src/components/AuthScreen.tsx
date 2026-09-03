@@ -17,12 +17,13 @@ import { useTheme } from '../context/ThemeContext';
 
 interface AuthScreenProps {
   onLoginSuccess: (user: { name: string; role: string; emailOrPhone: string }) => void;
+  onBack?: () => void;
 }
 
 type AuthMode = 'signin' | 'signup';
 type LoginMethod = 'email' | 'mobile' | 'gov_id';
 
-export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
+export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess, onBack }) => {
   const { theme, toggleTheme } = useTheme();
   const [authMode, setAuthMode] = useState<AuthMode>('signin');
   const [loginMethod, setLoginMethod] = useState<LoginMethod>('email');
@@ -106,9 +107,9 @@ export const AuthScreen: React.FC<AuthScreenProps> = ({ onLoginSuccess }) => {
       <div className="relative z-20 w-full px-4 pt-4 pb-2 flex items-center justify-between shrink-0">
         {/* Left Back / Quick Demo button */}
         <button
-          onClick={handleDemoGovLogin}
+          onClick={onBack ? onBack : handleDemoGovLogin}
           className="w-10 h-10 rounded-2xl bg-slate-900/80 hover:bg-slate-800 border border-slate-700/80 text-slate-300 hover:text-white transition-all backdrop-blur-md flex items-center justify-center shadow-lg active:scale-95"
-          title="Quick Instant Demo Login"
+          title={onBack ? "Back to Onboarding" : "Quick Instant Demo Login"}
         >
           <ChevronLeft className="w-5 h-5 text-slate-200" />
         </button>

@@ -1,4 +1,6 @@
 import React, { useEffect, useState, useCallback } from 'react';
+import { SplashScreen } from './components/SplashScreen';
+import { VehicleLanguageOnboarding } from './components/VehicleLanguageOnboarding';
 import { AuthScreen } from './components/AuthScreen';
 import { BharatNetraNavView } from './components/BharatNetraNavView';
 import { WeatherPredictionMobile } from './components/WeatherPredictionMobile';
@@ -21,7 +23,7 @@ import {
   fetchAlerts
 } from './services/api';
 
-// Default initial location: Shimla / Pune
+// Default initial location: Pune / Shimla
 const DEFAULT_LAT = 18.5204;
 const DEFAULT_LON = 73.8567;
 const DEFAULT_NAME = 'Pune, Maharashtra, India';
@@ -30,9 +32,11 @@ interface UserProfile {
   name: string;
   role: string;
   emailOrPhone: string;
+  language?: string;
+  vehicle?: string;
 }
 
-type ActiveView = 'auth' | 'navigation' | 'weather_prediction';
+type ActiveView = 'splash' | 'onboarding' | 'auth' | 'navigation' | 'weather_prediction';
 
 function MainAppContent() {
   const [currentUser, setCurrentUser] = useState<UserProfile | null>(() => {
@@ -47,7 +51,13 @@ function MainAppContent() {
     return null;
   });
 
-  const [activeView, setActiveView] = useState<ActiveView>(currentUser ? 'navigation' : 'auth');
+  // Selected Preferences during Onboarding
+  const [userPreferences, setUserPreferences] = useState<{ language: string; vehicle: string }>({
+    language: 'en',
+    vehicle: 'car'
+  });
+
+  const [activeView, setActiveView] = useState<ActiveView>(currentUser ? 'navigation' : 'splash');
   const [lat, setLat] = useState<number>(DEFAULT_LAT);
   const [lon, setLon] = useState<number>(DEFAULT_LON);
   const [locationName, setLocationName] = useState<string>(DEFAULT_NAME);
@@ -118,26 +128,51 @@ function MainAppContent() {
     loadDataForLocation(lat, lon, locationName);
   };
 
-  const handleLoginSuccess = (userProfile: UserProfile) => {
-    setCurrentUser(userProfile);
-    localStorage.setItem('bharat_netra_user', JSON.stringify(userProfile));
+  const handleOnboardingContinue = (prefs: { language: string; vehicle: string }) => {
+    setUserPreferences(prefs);
+    setActiveView('auth');
+  };
+
+  const handleLoginSuccess = (userProfile: { name: string; role: string; emailOrPhone: string }) => {
+    const fullProfile: UserProfile = {
+      ...userProfile,
+      ...userPreferences
+    };
+    setCurrentUser(fullProfile);
+    localStorage.setItem('bharat_netra_user', JSON.stringify(fullProfile));
     setActiveView('navigation');
   };
 
   const handleLogout = () => {
     setCurrentUser(null);
     localStorage.removeItem('bharat_netra_user');
-    setActiveView('auth');
+    setActiveView('splash');
   };
 
   return (
     <MobileAppWrapper>
-      {/* 1. AUTH SCREEN (Matching Image 1) */}
-      {activeView === 'auth' && (
-        <AuthScreen onLoginSuccess={handleLoginSuccess} />
+      {/* 1. SPLASH SCREEN (Matching Image 1: India Night Satellite Map + BHARAT नेत्र + GET STARTED) */}
+      {activeView === 'splash' && (
+        <SplashScreen onGetStarted={() => setActiveView('onboarding')} />
       )}
 
-      {/* 2. BHARAT NETRA NAVIGATION VIEW (Matching Image 2) */}
+      {/* 2. VEHICLE & LANGUAGE ONBOARDING (Matching Image 2: 6 Languages + 4 Vehicle Cards + Continue Button) */}
+      {activeView === 'onboarding' && (
+        <VehicleLanguageOnboarding
+          onBack={() => setActiveView('splash')}
+          onContinue={handleOnboardingContinue}
+        />
+      )}
+
+      {/* 3. WELCOME & AUTH SCREEN (Matching Image 3: Email / Mobile OTP / Gov Authority Credentials) */}
+      {activeView === 'auth' && (
+        <AuthScreen
+          onLoginSuccess={handleLoginSuccess}
+          onBack={() => setActiveView('onboarding')}
+        />
+      )}
+
+      {/* 4. BHARAT NETRA ROAD NAVIGATION VIEW (Live Safe Route Engine & Map) */}
       {activeView === 'navigation' && (
         <BharatNetraNavView
           user={currentUser}
@@ -149,7 +184,7 @@ function MainAppContent() {
         />
       )}
 
-      {/* 3. WEATHER & LANDSLIDE PREDICTION MOBILE VIEW (Matching Image 3 on Mobile) */}
+      {/* 5. WEATHER & LANDSLIDE PREDICTION MOBILE VIEW (When clicking 'Nearby') */}
       {activeView === 'weather_prediction' && (
         <WeatherPredictionMobile
           currentLat={lat}
